@@ -4,6 +4,7 @@ on:
   push:
     branches: ["main"]
   pull_request:
+  workflow_dispatch:
 
 permissions:
   contents: read
@@ -17,6 +18,7 @@ jobs:
       - uses: actions/setup-python@v5
         with:
           python-version: "3.12"
+          cache: "pip"
 
       - name: Install
         run: |
@@ -30,4 +32,15 @@ jobs:
         run: mypy
 
       - name: Tests
-        run: pytest --cov=painfinder --cov-report=term-missing --cov-fail-under=85
+        run: |
+          pytest \
+            --cov=painfinder \
+            --cov-report=term-missing \
+            --cov-report=xml \
+            --cov-fail-under=85
+
+      - name: Upload coverage
+        uses: actions/upload-artifact@v4
+        with:
+          name: coverage-xml
+          path: coverage.xml
