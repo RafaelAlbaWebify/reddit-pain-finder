@@ -6,7 +6,6 @@ from dataclasses import dataclass
 
 from painfinder.domain import PainSignal, SourceItem
 
-
 STOP_WORDS = {
     "about",
     "after",
@@ -61,8 +60,7 @@ def build_opportunity_clusters(
         item = items_by_id.get(signal.source_external_id)
         if item is None:
             continue
-        key = _cluster_key(item, signal)
-        grouped[key].append(signal)
+        grouped[_cluster_key(item)].append(signal)
 
     clusters = [
         _build_cluster(key, group, items_by_id)
@@ -71,10 +69,9 @@ def build_opportunity_clusters(
     return sorted(clusters, key=lambda cluster: (-cluster.score, cluster.label))
 
 
-def _cluster_key(item: SourceItem, signal: PainSignal) -> str:
+def _cluster_key(item: SourceItem) -> str:
     tokens = _meaningful_tokens(f"{item.title} {item.body}")
-    topic = "-".join(tokens[:3]) if tokens else "general"
-    return f"{signal.category.value}:{topic}"
+    return "-".join(tokens[:3]) if tokens else "general"
 
 
 def _build_cluster(
@@ -107,8 +104,11 @@ def _build_cluster(
         for signal in sorted(signals, key=lambda value: -value.confidence)[:3]
     )
 
-    topic = key.split(":", maxsplit=1)[1].replace("-", " ")
-    label = f"{categories[0].replace('_', ' ').title()}: {topic.title()}"
+    topic = key.replace("-", " ").title()
+    category_label = ", ".join(
+        category.replace("_", " ").title() for category in categories
+    )
+    label = f"{topic} ({category_label})"
 
     return OpportunityCluster(
         key=key,
