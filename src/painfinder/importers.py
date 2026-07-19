@@ -2,12 +2,15 @@ from __future__ import annotations
 
 import csv
 import json
+from collections.abc import Mapping
 from pathlib import Path
 from typing import Any
 
 from pydantic import HttpUrl, ValidationError
 
 from painfinder.domain import SourceItem, SourceType
+
+REQUIRED_FIELDS = {"external_id", "body", "canonical_url"}
 
 
 class ImportFormatError(RuntimeError):
@@ -55,6 +58,10 @@ def _import_jsonl(path: Path) -> list[SourceItem]:
             raise ImportFormatError(
                 f"Invalid JSON on line {line_number}: {error.msg}"
             ) from error
+        if not isinstance(payload, Mapping):
+            raise ImportFormatError(
+                f"Invalid source item at line {line_number}: expected a JSON object"
+            )
         items.append(_source_item_from_mapping(payload, line_number=line_number))
     return items
 
@@ -64,6 +71,12 @@ def _import_csv(path: Path) -> list[SourceItem]:
         reader = csv.DictReader(handle)
         if reader.fieldnames is None:
             raise ImportFormatError("CSV file has no header")
+        normalized_headers = {header.strip() for header in reader.fieldnames if header}
+        missing = sorted(REQUIRED_FIELDS - normalized_headers)
+        if missing:
+            raise ImportFormatError(
+                "CSV file is missing required header(s): " + ", ".join(missing)
+            )
         return [
             _source_item_from_mapping(row, line_number=index)
             for index, row in enumerate(reader, start=2)
@@ -71,24 +84,39 @@ def _import_csv(path: Path) -> list[SourceItem]:
 
 
 def _source_item_from_mapping(
-    payload: dict[str, Any],
+    payload: Mapping[str, Any],
     *,
     line_number: int,
 ) -> SourceItem:
     try:
-        source_type = SourceType(str(payload.get("source_type", "post")))
+        source_type = SourceType(_required_text(payload, "source_type", default="post"))
         return SourceItem(
-            external_id=str(payload["external_id"]),
+            external_id=_required_text(payload, "external_id"),
             source_type=source_type,
-            title=str(payload.get("title", "") or ""),
-            body=str(payload["body"]),
+            title=_optional_text(payload.get("title")) or "",
+            body=_required_text(payload, "body"),
             subreddit=_optional_text(payload.get("subreddit")),
-            canonical_url=HttpUrl(str(payload["canonical_url"])),
+            canonical_url=HttpUrl(_required_text(payload, "canonical_url")),
         )
     except (KeyError, ValueError, ValidationError) as error:
         raise ImportFormatError(
             f"Invalid source item at line {line_number}: {error}"
         ) from error
+
+
+def _required_text(
+    payload: Mapping[str, Any],
+    key: str,
+    *,
+    default: str | None = None,
+) -> str:
+    value = payload.get(key, default)
+    if value is None:
+        raise KeyError(key)
+    text = str(value).strip()
+    if not text:
+        raise ValueError(f"{key} must not be blank")
+    return text
 
 
 def _optional_text(value: Any) -> str | None:
