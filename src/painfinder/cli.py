@@ -42,7 +42,7 @@ def discover(
     try:
         imported = import_source_items(input)
     except ImportFormatError as error:
-        typer.echo(f"ERROR: {error}", err=True)
+        typer.echo(f"ERROR: {error}")
         raise typer.Exit(code=2) from error
 
     items = deduplicate_items(imported)
