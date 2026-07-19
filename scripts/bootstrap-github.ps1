@@ -24,20 +24,83 @@ if (-not $Owner) {
     $Owner = (gh api user --jq .login).Trim()
 }
 $FullName = "$Owner/$RepoName"
+$RemoteUrl = "https://github.com/$FullName.git"
 
 if (-not (Test-Path ".git")) {
     git init -b main
+    if ($LASTEXITCODE -ne 0) {
+        throw "git init failed."
+    }
 }
+
 git add .
-git commit -m "chore: establish verified vertical slice zero"
-
-$existing = gh repo view $FullName --json nameWithOwner 2>$null
-if ($LASTEXITCODE -eq 0) {
-    throw "Repository $FullName already exists. This script will not overwrite it."
+if ($LASTEXITCODE -ne 0) {
+    throw "git add failed."
 }
 
-gh repo create $FullName "--$Visibility" --source=. --remote=origin --push `
-    --description "Local-first Reddit customer-pain discovery workbench"
+git rev-parse --verify HEAD *> $null
+$HasCommit = ($LASTEXITCODE -eq 0)
+
+$Changes = git status --porcelain
+if (-not $HasCommit) {
+    git commit -m "chore: establish verified project baseline"
+    if ($LASTEXITCODE -ne 0) {
+        throw "Initial git commit failed."
+    }
+}
+elseif ($Changes) {
+    git commit -m "chore: update verified project baseline"
+    if ($LASTEXITCODE -ne 0) {
+        throw "Git commit failed."
+    }
+}
+else {
+    Write-Host "INFO: local repository already has a clean commit."
+}
+
+$RemoteNames = git remote
+$HasOrigin = $RemoteNames -contains "origin"
+
+if ($HasOrigin) {
+    $CurrentOrigin = (git remote get-url origin).Trim()
+    if ($CurrentOrigin -ne $RemoteUrl) {
+        throw "origin points to '$CurrentOrigin', expected '$RemoteUrl'."
+    }
+
+    git push -u origin main
+    if ($LASTEXITCODE -eq 0) {
+        Write-Host "PASS: pushed main to https://github.com/$FullName" -ForegroundColor Green
+        exit 0
+    }
+
+    throw "origin exists but push failed."
+}
+
+$CreateOutput = & gh repo create $FullName "--$Visibility" --source=. --remote=origin --push `
+    --description "Local-first Reddit customer-pain discovery workbench" 2>&1
+$CreateExit = $LASTEXITCODE
+
+if ($CreateExit -ne 0) {
+    $Text = ($CreateOutput | Out-String).Trim()
+
+    if ($Text -match "Name already exists on this account" -or
+        $Text -match "already exists") {
+        git remote add origin $RemoteUrl
+        if ($LASTEXITCODE -ne 0) {
+            throw "Repository exists, but adding origin failed."
+        }
+
+        git push -u origin main
+        if ($LASTEXITCODE -ne 0) {
+            throw "Repository exists, but push failed."
+        }
+
+        Write-Host "PASS: connected and pushed to https://github.com/$FullName" -ForegroundColor Green
+        exit 0
+    }
+
+    throw "GitHub repository creation failed: $Text"
+}
 
 Write-Host "PASS: created and pushed https://github.com/$FullName" -ForegroundColor Green
-Write-Host "Next: inspect the CI run before beginning live Reddit collection."
+Write-Host "Next: inspect the GitHub Actions CI run."
