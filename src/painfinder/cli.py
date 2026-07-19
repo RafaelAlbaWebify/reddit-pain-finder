@@ -6,7 +6,7 @@ import typer
 
 from painfinder.analysis import detect_pain_signals
 from painfinder.domain import ResearchRun
-from painfinder.importers import deduplicate_items, import_source_items
+from painfinder.importers import ImportFormatError, deduplicate_items, import_source_items
 from painfinder.opportunities import build_opportunity_clusters
 from painfinder.opportunity_report import write_opportunity_report
 from painfinder.playwright_collector import PlaywrightRedditCollector
@@ -39,7 +39,12 @@ def discover(
     output: Annotated[Path, typer.Option()] = Path("output/opportunities.html"),
 ) -> None:
     """Import evidence and generate a ranked opportunity report."""
-    imported = import_source_items(input)
+    try:
+        imported = import_source_items(input)
+    except ImportFormatError as error:
+        typer.echo(f"ERROR: {error}", err=True)
+        raise typer.Exit(code=2) from error
+
     items = deduplicate_items(imported)
     signals = detect_pain_signals(items)
     clusters = build_opportunity_clusters(items, signals)
