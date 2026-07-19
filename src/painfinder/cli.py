@@ -6,6 +6,9 @@ import typer
 
 from painfinder.analysis import detect_pain_signals
 from painfinder.domain import ResearchRun
+from painfinder.importers import deduplicate_items, import_source_items
+from painfinder.opportunities import build_opportunity_clusters
+from painfinder.opportunity_report import write_opportunity_report
 from painfinder.playwright_collector import PlaywrightRedditCollector
 from painfinder.reddit_fixture import extract_thread_fixture
 from painfinder.report import write_html_report
@@ -28,6 +31,24 @@ def demo(
     signals = detect_pain_signals(items)
     write_html_report(output, items, signals, source_kind="fixture")
     typer.echo(f"PASS: wrote {output} with {len(signals)} pain candidate(s)")
+
+
+@app.command()
+def discover(
+    input: Annotated[Path, typer.Option(exists=True, readable=True)],
+    output: Annotated[Path, typer.Option()] = Path("output/opportunities.html"),
+) -> None:
+    """Import evidence and generate a ranked opportunity report."""
+    imported = import_source_items(input)
+    items = deduplicate_items(imported)
+    signals = detect_pain_signals(items)
+    clusters = build_opportunity_clusters(items, signals)
+    write_opportunity_report(output, items=items, clusters=clusters)
+    typer.echo(
+        f"PASS: imported {len(imported)} item(s), retained {len(items)} unique item(s), "
+        f"found {len(signals)} pain signal(s), built {len(clusters)} cluster(s)"
+    )
+    typer.echo(f"Report: {output}")
 
 
 @app.command("live-smoke")
