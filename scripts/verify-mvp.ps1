@@ -15,9 +15,16 @@ $Stamp = Get-Date -Format "yyyyMMdd-HHmmss"
 $EvidenceRoot = Join-Path $ProjectPath "artifacts\verification\$Stamp"
 $Database = Join-Path $EvidenceRoot "research.db"
 $RestoredDatabase = Join-Path $EvidenceRoot "restored.db"
+$RedditFixture = Join-Path $ProjectPath "tests\fixtures\reddit_thread.html"
 $Fixture = Join-Path $ProjectPath "tests\fixtures\imported_evidence.jsonl"
 $BenchmarkCorpus = Join-Path $ProjectPath "tests\fixtures\benchmark_corpus.jsonl"
 New-Item -ItemType Directory -Force $EvidenceRoot | Out-Null
+
+foreach ($RequiredInput in @($RedditFixture, $Fixture, $BenchmarkCorpus)) {
+    if (-not (Test-Path $RequiredInput)) {
+        throw "Verification input missing: $RequiredInput"
+    }
+}
 
 function Assert-ExitCode {
     param([string]$Step)
@@ -44,7 +51,7 @@ Assert-ExitCode "Pytest"
 
 Write-Host "[4/11] Fixture report" -ForegroundColor Cyan
 & $Python -m painfinder demo `
-    --input "tests\fixtures\thread_page.html" `
+    --input $RedditFixture `
     --output "$EvidenceRoot\fixture-report.html"
 Assert-ExitCode "Fixture demo"
 
