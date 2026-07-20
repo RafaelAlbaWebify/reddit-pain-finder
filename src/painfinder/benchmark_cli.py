@@ -11,6 +11,8 @@ from painfinder.benchmark import (
     load_benchmark,
     write_benchmark_results,
 )
+from painfinder.benchmark_review import write_review_worksheet
+from painfinder.storage import SQLiteResearchRepository
 
 benchmark_app = typer.Typer(no_args_is_help=True)
 
@@ -45,3 +47,28 @@ def run_benchmark(
     )
     typer.echo(f"JSON: {json_output}")
     typer.echo(f"HTML: {html_output}")
+
+
+@benchmark_app.command("prepare-review")
+def prepare_review(
+    run_id: Annotated[str, typer.Option()],
+    database: Annotated[Path, typer.Option(exists=True, readable=True)] = Path(
+        "data/research.db"
+    ),
+    output: Annotated[Path, typer.Option()] = Path(
+        "output/benchmark-review-worksheet.csv"
+    ),
+) -> None:
+    """Export persisted evidence into an unlabeled human-review worksheet."""
+    repository = SQLiteResearchRepository(database)
+    repository.initialize()
+    try:
+        item_count = write_review_worksheet(repository, run_id, output)
+    except KeyError as error:
+        typer.echo(f"ERROR: {error.args[0]}")
+        raise typer.Exit(code=2) from error
+
+    typer.echo(
+        f"PASS: prepared {item_count} evidence item(s) for independent review"
+    )
+    typer.echo(f"Worksheet: {output}")
