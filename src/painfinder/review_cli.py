@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from pathlib import Path
-from typing import Annotated
+from typing import Annotated, NoReturn
 
 import typer
 
@@ -122,7 +122,7 @@ def _service(database: Path) -> AnalystReviewService:
     return AnalystReviewService(repository)
 
 
-def _fail(error: Exception) -> None:
+def _fail(error: Exception) -> NoReturn:
     message = error.args[0] if error.args else str(error)
     typer.echo(f"ERROR: {message}")
     raise typer.Exit(code=2) from error
