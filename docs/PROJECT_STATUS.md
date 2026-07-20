@@ -17,8 +17,8 @@ Implementation credit means code, tests and documentation exist in an open branc
 | JSONL/CSV import and deduplication | 15% | Implemented and locally verified with validation and edge-case tests | 15% |
 | Pain detection, topic clustering and scoring | 20% | Implemented with verified evaluator; larger reviewed corpus still needed | 18% |
 | Traceable machine and reviewed HTML reports | 10% | Implemented and locally verified with source links, review state and caveats | 10% |
-| Durable storage and analyst decisions | 10% | Implemented and locally verified; future schema migration path still needed | 10% |
-| Repeatable CI and release readiness | 5% | Two complete local gates passed; GitHub Actions runner still blocked | 2% |
+| Durable storage and analyst decisions | 10% | Implemented and locally verified, including tested schema v1 to v2 migration | 10% |
+| Repeatable CI and release readiness | 5% | Complete local gates pass; GitHub Actions runner still blocked | 2% |
 | **Total implemented** | **100%** |  | **95%** |
 
 ## Implemented and locally verified on the open stack
@@ -33,6 +33,7 @@ Implementation credit means code, tests and documentation exist in an open branc
 - initial prioritization scoring with explicit limitations;
 - canonical source links in machine-generated reports;
 - SQLite research runs, evidence, signals, clusters and decision storage;
+- automatic schema v1 to v2 migration with run-scoped indexes and data-preservation coverage;
 - stored-run listing and inspection commands;
 - portable run export and restore with prevalidation and audit timestamp retention;
 - analyst accept, reject, annotate, merge and split actions;
@@ -40,7 +41,7 @@ Implementation credit means code, tests and documentation exist in an open branc
 - benchmark precision, recall, category and pairwise clustering metrics;
 - one-command MVP verification with timestamped evidence output;
 - complete offline Windows verification;
-- complete Windows verification with the bounded official Hacker News smoke enabled.
+- complete Windows verification with the bounded official Hacker News smoke enabled after the schema migration.
 
 ## Remaining MVP and release work
 
@@ -48,9 +49,8 @@ Implementation credit means code, tests and documentation exist in an open branc
 2. Merge the stacked PRs in order using `docs/MERGE_RUNBOOK.md`.
 3. Rerun both complete verification modes from merged `main` and retain the evidence.
 4. Expand the benchmark beyond its small behavior-proving fixture before using metrics to tune rules.
-5. Implement and test a real schema migration path beyond schema version 1.
-6. Update the verified-and-merged baseline and publish the prerelease only after the final `main` gate passes.
+5. Update the verified-and-merged baseline and publish the prerelease only after the final `main` gate passes.
 
 ## Interpretation
 
-The defined MVP implementation is locally verified. The remaining five percent is release-critical rather than feature breadth: GitHub Actions recovery, ordered integration into `main`, final merged-commit evidence, benchmark depth and future schema migration support.
+The defined MVP implementation is locally verified. The remaining five percent is release-critical rather than feature breadth: GitHub Actions recovery, ordered integration into `main`, final merged-commit evidence and benchmark depth.
