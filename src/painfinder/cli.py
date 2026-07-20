@@ -5,6 +5,7 @@ from typing import Annotated
 import typer
 
 from painfinder.analysis import detect_pain_signals
+from painfinder.benchmark_cli import benchmark_app
 from painfinder.domain import ResearchRun, SourceItem
 from painfinder.importers import ImportFormatError, deduplicate_items, import_source_items
 from painfinder.opportunities import build_opportunity_clusters
@@ -18,6 +19,7 @@ from painfinder.storage import SQLiteResearchRepository
 
 app = typer.Typer(no_args_is_help=True)
 app.add_typer(review_app, name="review")
+app.add_typer(benchmark_app, name="benchmark")
 
 
 @app.callback()
