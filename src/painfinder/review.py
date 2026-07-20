@@ -3,6 +3,7 @@ from __future__ import annotations
 import json
 from dataclasses import dataclass, field, replace
 from enum import StrEnum
+from typing import Any
 
 from painfinder.opportunities import OpportunityCluster
 from painfinder.storage import AnalystDecision, SQLiteResearchRepository
@@ -228,7 +229,7 @@ class AnalystReviewService:
         return reviewed.cluster
 
 
-def _payload(decision: AnalystDecision) -> dict[str, object]:
+def _payload(decision: AnalystDecision) -> dict[str, Any]:
     if decision.new_value is None:
         raise RuntimeError(f"Decision {decision.decision_id} has no payload")
     value = json.loads(decision.new_value)
