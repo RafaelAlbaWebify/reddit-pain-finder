@@ -12,6 +12,7 @@ from painfinder.opportunity_report import write_opportunity_report
 from painfinder.playwright_collector import PlaywrightRedditCollector
 from painfinder.reddit_fixture import extract_thread_fixture
 from painfinder.report import write_html_report
+from painfinder.run_packages import RunPackageError, restore_run_package
 from painfinder.storage import SQLiteResearchRepository
 
 app = typer.Typer(no_args_is_help=True)
@@ -99,6 +100,21 @@ def export_run(
         typer.echo(f"ERROR: {error.args[0]}")
         raise typer.Exit(code=2) from error
     typer.echo(f"PASS: exported run {run_id} to {output}")
+
+
+@app.command("restore-run")
+def restore_run(
+    package: Annotated[Path, typer.Option(exists=True, readable=True)],
+    database: Annotated[Path, typer.Option()] = Path("data/research.db"),
+) -> None:
+    """Restore an exported research run as a new local run."""
+    repository = SQLiteResearchRepository(database)
+    try:
+        run = restore_run_package(repository, package)
+    except RunPackageError as error:
+        typer.echo(f"ERROR: {error}")
+        raise typer.Exit(code=2) from error
+    typer.echo(f"PASS: restored run {run.run_id} ({run.name}) into {database}")
 
 
 @app.command("live-smoke")
