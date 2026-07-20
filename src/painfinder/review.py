@@ -114,17 +114,20 @@ class AnalystReviewService:
         cluster = self._required_cluster(run_id, cluster_key)
         clean_new_key = new_key.strip()
         clean_label = label.strip()
-        selected = tuple(sorted({value.strip() for value in source_ids if value.strip()}))
+        requested = {value.strip() for value in source_ids if value.strip()}
         if not clean_new_key or not clean_label:
             raise ValueError("Split key and label must not be blank")
         if clean_new_key in self.reviewed_clusters(run_id):
             raise ValueError(f"Cluster key already exists: {clean_new_key}")
-        if not selected:
+        if not requested:
             raise ValueError("A split requires at least one source item")
-        if not set(selected).issubset(cluster.source_ids):
+        if not requested.issubset(cluster.source_ids):
             raise ValueError("Split source IDs must belong to the original cluster")
-        if set(selected) == set(cluster.source_ids):
+        if requested == set(cluster.source_ids):
             raise ValueError("A split must leave evidence in the original cluster")
+        selected = tuple(
+            source_id for source_id in cluster.source_ids if source_id in requested
+        )
         payload = json.dumps(
             {
                 "new_key": clean_new_key,
@@ -294,15 +297,11 @@ def _payload_source_ids(
             f"Decision {decision.decision_id} payload field source_ids is invalid"
         )
     selected = tuple(
-        sorted(
-            {
-                item.strip()
-                for item in value
-                if isinstance(item, str) and item.strip()
-            }
-        )
+        item.strip()
+        for item in value
+        if isinstance(item, str) and item.strip()
     )
-    if not selected or len(selected) != len(value):
+    if not selected or len(selected) != len(value) or len(set(selected)) != len(selected):
         raise RuntimeError(
             f"Decision {decision.decision_id} payload field source_ids is invalid"
         )
