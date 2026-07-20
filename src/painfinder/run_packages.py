@@ -176,14 +176,17 @@ def _list(payload: dict[str, Any], key: str) -> list[Any]:
 
 
 def _required_text(payload: dict[str, Any], key: str) -> str:
-    value = str(payload[key]).strip()
-    if not value:
-        raise RunPackageError(f"Invalid run package: {key} must not be blank")
-    return value
+    value = payload.get(key)
+    if not isinstance(value, str) or not value.strip():
+        raise RunPackageError(f"Invalid run package: {key} must be non-blank text")
+    return value.strip()
 
 
 def _optional_text(value: Any) -> str | None:
     if value is None:
         return None
-    text = str(value)
-    return text if text else None
+    if not isinstance(value, str):
+        raise RunPackageError(
+            "Invalid run package: optional decision values must be text or null"
+        )
+    return value if value else None
