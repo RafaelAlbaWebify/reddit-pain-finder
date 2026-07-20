@@ -110,7 +110,7 @@ class HackerNewsCollector:
             return HackerNewsCollectionResult(items, evidence, "malformed_response")
 
         for raw_story_id in story_ids:
-            if not isinstance(raw_story_id, int):
+            if not _is_integer_id(raw_story_id):
                 continue
             if self._runtime_exhausted(policy, started_at):
                 return HackerNewsCollectionResult(
@@ -149,7 +149,7 @@ class HackerNewsCollector:
             for raw_comment_id in comment_ids:
                 if collected_comments >= policy.max_comments_per_thread:
                     break
-                if not isinstance(raw_comment_id, int):
+                if not _is_integer_id(raw_comment_id):
                     continue
                 if self._runtime_exhausted(policy, started_at):
                     return HackerNewsCollectionResult(
@@ -238,10 +238,13 @@ def _http_status(code: int) -> str:
 def _story_to_source_item(payload: dict[str, Any]) -> SourceItem | None:
     if payload.get("deleted") or payload.get("dead"):
         return None
+    item_type = payload.get("type")
+    if item_type not in (None, "story"):
+        return None
     item_id = payload.get("id")
     title = _clean_text(payload.get("title"))
     text = _clean_html(payload.get("text"))
-    if not isinstance(item_id, int) or not title:
+    if not _is_integer_id(item_id) or not title:
         return None
     return SourceItem(
         external_id=f"hn-story-{item_id}",
@@ -256,9 +259,12 @@ def _story_to_source_item(payload: dict[str, Any]) -> SourceItem | None:
 def _comment_to_source_item(payload: dict[str, Any]) -> SourceItem | None:
     if payload.get("deleted") or payload.get("dead"):
         return None
+    item_type = payload.get("type")
+    if item_type not in (None, "comment"):
+        return None
     item_id = payload.get("id")
     text = _clean_html(payload.get("text"))
-    if not isinstance(item_id, int) or not text:
+    if not _is_integer_id(item_id) or not text:
         return None
     return SourceItem(
         external_id=f"hn-comment-{item_id}",
@@ -268,6 +274,10 @@ def _comment_to_source_item(payload: dict[str, Any]) -> SourceItem | None:
         subreddit="hackernews",
         canonical_url=f"https://news.ycombinator.com/item?id={item_id}",
     )
+
+
+def _is_integer_id(value: Any) -> bool:
+    return isinstance(value, int) and not isinstance(value, bool) and value > 0
 
 
 def _clean_html(value: Any) -> str:
