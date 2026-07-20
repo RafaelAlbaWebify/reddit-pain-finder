@@ -8,7 +8,7 @@ from contextlib import contextmanager
 from dataclasses import dataclass
 from datetime import UTC, datetime
 from pathlib import Path
-from typing import Iterator
+from collections.abc import Iterator
 
 from painfinder.domain import PainCategory, PainSignal, SourceItem, SourceType
 from painfinder.opportunities import OpportunityCluster
