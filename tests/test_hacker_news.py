@@ -31,6 +31,7 @@ def _policy(
     max_pages: int = 10,
     max_threads: int = 2,
     max_comments: int = 1,
+    max_runtime_seconds: int = 900,
 ) -> ResearchRun:
     return ResearchRun(
         name="hn-test",
@@ -38,6 +39,7 @@ def _policy(
         max_threads=max_threads,
         max_comments_per_thread=max_comments,
         min_delay_seconds=0.5,
+        max_runtime_seconds=max_runtime_seconds,
         live_access_enabled=True,
         concurrency=1,
     )
@@ -135,6 +137,10 @@ def test_policy_and_host_boundaries_are_enforced() -> None:
         _ensure_allowed_url("https://example.com/v0/item/1.json")
     with pytest.raises(ValueError, match="outside approved"):
         _ensure_allowed_url("http://hacker-news.firebaseio.com/v0/item/1.json")
+    with pytest.raises(ValueError, match="outside approved"):
+        _ensure_allowed_url(
+            "https://hacker-news.firebaseio.com/v0/item/1.json?redirect=1"
+        )
 
 
 def test_page_budget_stops_before_fetching_story() -> None:
@@ -147,4 +153,23 @@ def test_page_budget_stops_before_fetching_story() -> None:
     ).collect(policy=_policy(max_pages=1), feed="topstories")
 
     assert result.stop_reason == "budget_exhausted"
+    assert transport.calls == [feed]
+
+
+def test_runtime_budget_stops_after_feed_request() -> None:
+    feed = f"{API_BASE}/topstories.json"
+    transport = FakeTransport({feed: [1]})
+    clock_values = iter([0.0, 0.0, 31.0])
+
+    result = HackerNewsCollector(
+        transport=transport,
+        sleep=lambda _: None,
+        clock=lambda: next(clock_values),
+    ).collect(
+        policy=_policy(max_runtime_seconds=30),
+        feed="topstories",
+    )
+
+    assert result.stop_reason == "runtime_exhausted"
+    assert result.items == []
     assert transport.calls == [feed]
