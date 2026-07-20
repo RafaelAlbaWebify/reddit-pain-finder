@@ -4,7 +4,9 @@ from typing import Any
 from urllib.error import HTTPError
 
 import pytest
+from typer.testing import CliRunner
 
+from painfinder.cli import app
 from painfinder.domain import ResearchRun, SourceType
 from painfinder.hacker_news import (
     API_BASE,
@@ -173,3 +175,10 @@ def test_runtime_budget_stops_after_feed_request() -> None:
     assert result.stop_reason == "runtime_exhausted"
     assert result.items == []
     assert transport.calls == [feed]
+
+
+def test_hacker_news_commands_are_registered_in_main_cli() -> None:
+    result = CliRunner().invoke(app, ["hacker-news", "--help"])
+
+    assert result.exit_code == 0
+    assert "smoke" in result.stdout
