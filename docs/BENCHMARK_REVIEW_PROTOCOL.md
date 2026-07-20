@@ -1,0 +1,79 @@
+# Benchmark corpus review protocol
+
+Use this protocol to expand the benchmark with manually reviewed public-discussion evidence. The objective is to measure detector and clustering behavior, not to manufacture favorable metrics.
+
+## Evidence selection
+
+- Use public, lawfully obtained discussion evidence already collected or imported by the project.
+- Sample across multiple communities, workflows and writing styles.
+- Include clear pain, ambiguous cases and neutral operational discussion.
+- Preserve the canonical source URL and a stable external ID.
+- Remove usernames and unnecessary personal information.
+- Do not duplicate near-identical excerpts merely to increase case count.
+
+## Independent review
+
+Each item should be reviewed without looking at the detector output.
+
+Record:
+
+- `expected_pain`: whether the text contains an actionable workflow pain;
+- `expected_categories`: all supported categories clearly evidenced by the text;
+- `expected_cluster`: a concise topic identifier shared only by items describing the same underlying workflow problem;
+- `reviewer_notes`: a short rationale kept in the worksheet, not in the benchmark JSONL;
+- `review_status`: `pending`, `reviewed`, or `disputed`.
+
+Do not label a case as pain solely because the product could theoretically help it. Label only what the source text supports.
+
+## Category guidance
+
+Use only categories supported by `PainCategory`. An expected category should describe evidence present in the text, not a guessed root cause.
+
+When an item is neutral:
+
+- set `expected_pain` to `false`;
+- leave `expected_categories` empty;
+- leave `expected_cluster` empty.
+
+## Cluster guidance
+
+Cluster IDs are reviewed topic identities, not detector keys.
+
+- Use the same ID for evidence about the same workflow pain across communities.
+- Use different IDs for merely related domains with different operational problems.
+- Do not include category names solely to force or prevent a match.
+- Exclude neutral items from reviewed cluster relationships.
+
+## Review workflow
+
+1. Copy `examples/benchmark-review-worksheet.csv` to a dated working file.
+2. Add evidence rows with source text and canonical URLs.
+3. Complete labels without running the detector.
+4. Resolve all `disputed` rows or exclude them from the benchmark.
+5. Convert reviewed rows to the JSONL corpus format documented in `docs/BENCHMARKING.md`.
+6. Run the benchmark and preserve JSON and HTML outputs.
+7. Record before/after outputs for every detector, category or clustering-rule change.
+
+## Minimum corpus quality before calibration
+
+Before using metrics to tune rules, the reviewed corpus should contain:
+
+- multiple independent communities;
+- multiple workflow categories;
+- positive and negative examples;
+- more than one reviewed cluster with at least two items;
+- examples expected to expose false positives, false negatives, fragmentation and over-merging;
+- no unresolved or disputed labels.
+
+There is intentionally no target precision or recall threshold yet. Thresholds must be chosen from representative evidence and product risk, not from the small behavior-proving fixture.
+
+## Audit expectations
+
+For each corpus revision, record:
+
+- review date;
+- reviewer identity or stable reviewer label;
+- evidence source and collection method;
+- number of included, excluded and disputed rows;
+- benchmark results before and after any rule change;
+- explanation for label or cluster changes.
