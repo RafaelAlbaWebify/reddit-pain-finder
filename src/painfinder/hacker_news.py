@@ -10,6 +10,7 @@ from urllib.parse import urlparse
 from urllib.request import Request, urlopen
 
 from bs4 import BeautifulSoup
+from pydantic import HttpUrl
 
 from painfinder.collection import CollectionBudget, StopReason
 from painfinder.domain import ResearchRun, SourceItem, SourceType
@@ -253,7 +254,7 @@ def _story_to_source_item(payload: dict[str, Any]) -> SourceItem | None:
         title=title,
         body=text or title,
         subreddit="hackernews",
-        canonical_url=f"https://news.ycombinator.com/item?id={item_id}",
+        canonical_url=HttpUrl(f"https://news.ycombinator.com/item?id={item_id}"),
     )
 
 
@@ -273,7 +274,7 @@ def _comment_to_source_item(payload: dict[str, Any]) -> SourceItem | None:
         title="",
         body=text,
         subreddit="hackernews",
-        canonical_url=f"https://news.ycombinator.com/item?id={item_id}",
+        canonical_url=HttpUrl(f"https://news.ycombinator.com/item?id={item_id}"),
     )
 
 
