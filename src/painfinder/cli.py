@@ -16,12 +16,14 @@ from painfinder.reddit_fixture import extract_thread_fixture
 from painfinder.report import write_html_report
 from painfinder.review_cli import review_app
 from painfinder.run_packages import RunPackageError, restore_run_package
+from painfinder.runs_cli import runs_app
 from painfinder.storage import SQLiteResearchRepository
 
 app = typer.Typer(no_args_is_help=True)
 app.add_typer(review_app, name="review")
 app.add_typer(benchmark_app, name="benchmark")
 app.add_typer(hacker_news_app, name="hacker-news")
+app.add_typer(runs_app, name="runs")
 
 
 @app.callback()
