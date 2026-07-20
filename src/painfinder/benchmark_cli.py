@@ -12,6 +12,10 @@ from painfinder.benchmark import (
     write_benchmark_results,
 )
 from painfinder.benchmark_review import write_review_worksheet
+from painfinder.benchmark_review_import import (
+    ReviewWorksheetError,
+    import_review_worksheet,
+)
 from painfinder.storage import SQLiteResearchRepository
 
 benchmark_app = typer.Typer(no_args_is_help=True)
@@ -72,3 +76,21 @@ def prepare_review(
         f"PASS: prepared {item_count} evidence item(s) for independent review"
     )
     typer.echo(f"Worksheet: {output}")
+
+
+@benchmark_app.command("import-review")
+def import_review(
+    worksheet: Annotated[Path, typer.Option(exists=True, readable=True)],
+    output: Annotated[Path, typer.Option()] = Path(
+        "output/reviewed-benchmark-corpus.jsonl"
+    ),
+) -> None:
+    """Validate a resolved review worksheet and emit benchmark JSONL."""
+    try:
+        case_count = import_review_worksheet(worksheet, output)
+    except ReviewWorksheetError as error:
+        typer.echo(f"ERROR: {error}")
+        raise typer.Exit(code=2) from error
+
+    typer.echo(f"PASS: imported {case_count} resolved benchmark case(s)")
+    typer.echo(f"Corpus: {output}")

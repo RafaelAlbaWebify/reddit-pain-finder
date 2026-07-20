@@ -30,6 +30,20 @@ The command preserves evidence identity, title, body, community and canonical UR
 
 The static [`../examples/benchmark-review-worksheet.csv`](../examples/benchmark-review-worksheet.csv) remains a format example.
 
+## Import a resolved worksheet
+
+After independent review and disagreement resolution, convert the completed worksheet into benchmark JSONL:
+
+```powershell
+.\.venv\Scripts\python.exe -m painfinder benchmark import-review `
+  --worksheet output\benchmark-review-worksheet.csv `
+  --output output\reviewed-benchmark-corpus.jsonl
+```
+
+The importer validates the complete worksheet before writing output. Every row must be marked `resolved` and include an explicit pain label, reviewer, timezone-aware review timestamp and rationale. Positive pain cases require at least one valid category and a cluster identifier. Negative cases must not define categories or a cluster. Duplicate evidence IDs, malformed source records and inconsistent labels are rejected.
+
+The importer never creates labels or tunes detector rules.
+
 ## Run the benchmark
 
 ```powershell
