@@ -10,7 +10,13 @@ def write_html_report(
     output: Path,
     items: list[SourceItem],
     signals: list[PainSignal],
+    *,
+    source_kind: str = "fixture",
+    stop_reason: str | None = None,
 ) -> None:
+    if source_kind not in {"fixture", "live"}:
+        raise ValueError("source_kind must be 'fixture' or 'live'")
+
     by_id = {item.external_id: item for item in items}
     rows = []
     for signal in signals:
@@ -25,11 +31,29 @@ def write_html_report(
             "</tr>"
         )
 
+    if source_kind == "fixture":
+        title = "Fixture Evidence Report"
+        notice = (
+            "This report was produced from a local test fixture, "
+            "not a verified live Reddit collection."
+        )
+    else:
+        title = "Live Collection Evidence Report"
+        notice = (
+            "This report records the outcome of a bounded live collection run. "
+            "A stopped or blocked run is evidence of collection state, not evidence "
+            "that no customer pain exists."
+        )
+
+    stop_html = ""
+    if stop_reason:
+        stop_html = f"<p><strong>Stop reason:</strong> {escape(stop_reason)}</p>"
+
     html = f"""<!doctype html>
 <html lang="en">
 <head>
 <meta charset="utf-8">
-<title>Reddit Pain Finder — Fixture Evidence Report</title>
+<title>Reddit Pain Finder — {escape(title)}</title>
 <style>
 body {{
   font-family: system-ui, sans-serif;
@@ -52,11 +76,9 @@ th, td {{
 </style>
 </head>
 <body>
-<h1>Fixture Evidence Report</h1>
-<p class="warning">
-This report was produced from a local test fixture,
-not a verified live Reddit collection.
-</p>
+<h1>{escape(title)}</h1>
+<p class="warning">{escape(notice)}</p>
+{stop_html}
 <p>Source items: {len(items)} · Candidate pain signals: {len(signals)}</p>
 <table>
 <thead>

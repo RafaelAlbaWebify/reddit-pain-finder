@@ -13,29 +13,45 @@ if (-not (Test-Path $Source)) {
 
 $Stamp = Get-Date -Format "yyyyMMdd-HHmmss"
 $Destination = "$HOME\Downloads\reddit-pain-finder-live-artifacts-$Stamp.zip"
+$Staging = Join-Path $env:TEMP "reddit-pain-finder-live-artifacts-$Stamp"
 
-$Required = @(
+if (Test-Path $Staging) {
+    Remove-Item $Staging -Recurse -Force
+}
+New-Item -ItemType Directory -Force $Staging | Out-Null
+
+$Allowed = @(
     "live-report.html",
-    "traces\collection-trace.zip"
+    "collection-result.json",
+    "screenshots",
+    "traces"
 )
 
-$Missing = @()
-foreach ($Relative in $Required) {
-    if (-not (Test-Path (Join-Path $Source $Relative))) {
-        $Missing += $Relative
+$Copied = @()
+foreach ($Relative in $Allowed) {
+    $Item = Join-Path $Source $Relative
+    if (Test-Path $Item) {
+        Copy-Item $Item $Staging -Recurse -Force
+        $Copied += $Relative
     }
 }
 
 $Manifest = [ordered]@{
     created_at = (Get-Date).ToString("o")
-    project_path = $ProjectPath
     source_folder = $Source
-    missing_required_files = $Missing
+    included = $Copied
+    excluded_sensitive = @(
+        "browser-profile",
+        "cookies",
+        "login data",
+        "local storage",
+        "session storage"
+    )
     files = @(
-        Get-ChildItem $Source -Recurse -File |
+        Get-ChildItem $Staging -Recurse -File |
             ForEach-Object {
                 [ordered]@{
-                    relative_path = $_.FullName.Substring($Source.Length + 1)
+                    relative_path = $_.FullName.Substring($Staging.Length + 1)
                     size_bytes = $_.Length
                     modified_at = $_.LastWriteTime.ToString("o")
                 }
@@ -43,14 +59,13 @@ $Manifest = [ordered]@{
     )
 }
 
-$ManifestPath = Join-Path $Source "artifact-manifest.json"
-$Manifest | ConvertTo-Json -Depth 6 | Set-Content -Path $ManifestPath -Encoding UTF8
+$Manifest |
+    ConvertTo-Json -Depth 6 |
+    Set-Content -Path (Join-Path $Staging "artifact-manifest.json") -Encoding UTF8
 
-Compress-Archive -Path "$Source\*" -DestinationPath $Destination -Force
+Compress-Archive -Path "$Staging\*" -DestinationPath $Destination -Force
+Remove-Item $Staging -Recurse -Force
 
-Write-Host "PASS: live evidence packaged." -ForegroundColor Green
+Write-Host "PASS: privacy-safe live evidence packaged." -ForegroundColor Green
 Write-Host "ZIP: $Destination"
-
-if ($Missing.Count -gt 0) {
-    Write-Warning ("Missing expected files: " + ($Missing -join ", "))
-}
+Write-Host "Browser profile and cookies were excluded."

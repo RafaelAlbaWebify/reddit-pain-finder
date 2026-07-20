@@ -1,49 +1,50 @@
 # Reddit Pain Finder
 
-Local-first opportunity-discovery workbench for identifying evidence-backed customer pain hypotheses from bounded Reddit research sessions.
+Local-first opportunity-discovery workbench for identifying evidence-backed customer pain hypotheses from bounded discussion research.
 
-## Current status
+## Project status
 
-This repository contains **Vertical Slice 0**:
+**62% complete toward the defined local-first MVP.**
 
-- explicit domain models;
-- bounded collection policy;
-- Reddit-like HTML fixture extraction;
-- deterministic pain-candidate detection;
-- evidence report generation;
-- unit and integration tests;
-- GitHub Actions CI;
-- a disabled-by-default Playwright live adapter boundary.
+See:
 
-It does **not** yet claim to collect live Reddit successfully. Live collection is the next slice and must be proven against the current Reddit UI without bypassing access controls.
+- [`docs/PROJECT_STATUS.md`](docs/PROJECT_STATUS.md) for the weighted completion model;
+- [`docs/ROADMAP.md`](docs/ROADMAP.md) for remaining milestones;
+- [`docs/VERIFICATION_CHECKLIST.md`](docs/VERIFICATION_CHECKLIST.md) for the PR #2 merge gate.
+
+## Current capabilities
+
+- bounded, read-only Playwright Reddit smoke collection;
+- explicit stop handling for blocks, CAPTCHA, rate limits, login walls and selector mismatches;
+- screenshots and Playwright traces for browser evidence;
+- privacy-safe support bundles that exclude browser profiles and cookies;
+- JSONL and CSV evidence import;
+- validation, normalization and deduplication;
+- deterministic pain-signal detection;
+- topic-first candidate clustering and opportunity scoring;
+- canonical source links in opportunity reports;
+- standalone HTML evidence and opportunity reports;
+- strict type checking, linting and automated tests.
+
+## Current Reddit status
+
+A local smoke run against `old.reddit.com` received a genuine HTTP 403 network-security block from Reddit infrastructure. The collector classified the page correctly and stopped without trying to bypass the restriction.
+
+Development therefore continues through transport-independent evidence import while approved Reddit access is investigated.
 
 ## Safety boundaries
 
 - Read-only collection.
 - No posting, commenting, voting, messaging, or account changes.
 - No CAPTCHA solving, proxy rotation, fingerprint spoofing, or block evasion.
-- Single-browser context and bounded collection budgets.
-- Live Reddit access disabled unless explicitly enabled.
-- Source URLs and extraction failures remain visible in reports.
-- Usernames are not required for pain analysis.
-
-## Architecture
-
-```text
-research definition
-    -> bounded collection policy
-    -> Reddit adapter
-    -> normalized source items
-    -> pain candidate detection
-    -> evidence report
-```
-
-The collector and analyzer are separate. A UI change should not require rewriting the domain or reporting layers.
+- Single browser context and bounded collection budgets.
+- Browser profiles and cookies are excluded from evidence packages.
+- Source URLs and extraction failures remain visible.
+- Scores prioritize analyst review and do not prove market demand.
 
 ## Requirements
 
 - Python 3.12+
-- `uv` recommended
 - PowerShell 7 recommended on Windows
 
 ## Install and verify
@@ -54,7 +55,19 @@ Set-ExecutionPolicy -Scope Process Bypass
 .\scripts\verify.ps1
 ```
 
-## Run the fixture demo
+## Imported discovery
+
+Create a JSONL or CSV file using the templates under `examples/`, then run:
+
+```powershell
+.\.venv\Scripts\python.exe -m painfinder discover `
+  --input examples\evidence-template.csv `
+  --output output\opportunities.html
+```
+
+The generated report ranks candidate pain clusters by unique source evidence, community coverage, and detector confidence.
+
+## Fixture demo
 
 ```powershell
 .\.venv\Scripts\python.exe -m painfinder demo `
@@ -62,26 +75,29 @@ Set-ExecutionPolicy -Scope Process Bypass
   --output output\fixture-report.html
 ```
 
-## Live mode
+## Bounded live smoke test
 
-Live mode is intentionally unavailable in this slice. `LiveRedditCollector` raises a clear error until the next vertical slice defines and proves:
+```powershell
+.\scripts\install-browser.ps1
+.\scripts\live-smoke.ps1 `
+  -Subreddits smallbusiness `
+  -Sort new `
+  -MaxThreads 3 `
+  -MaxComments 10
+```
 
-1. stable page identification;
-2. bounded search navigation;
-3. thread extraction;
-4. block/CAPTCHA stop behavior;
-5. trace and screenshot evidence;
-6. a successful three-thread smoke run.
+This opens a visible Chromium window and stops immediately when Reddit presents a block or access-control page.
 
-## Next vertical slice
+## Architecture
 
-**Slice 1 — Bounded live Reddit discovery**
+```text
+bounded browser or imported evidence
+    -> validated source items
+    -> deduplication
+    -> pain-signal detection
+    -> topic-first candidate clustering
+    -> opportunity scoring
+    -> traceable HTML report
+```
 
-- headed Chromium persistent context;
-- one configured seed community;
-- new/rising/search sampling;
-- maximum three threads and ten comments per thread;
-- stop on block, CAPTCHA, login wall, or selector mismatch;
-- Playwright trace on failure;
-- HTML evidence report;
-- no autonomous opportunity scoring yet.
+The browser transport, imported evidence, analysis, clustering, and reporting layers remain separate so access failures do not halt product development.
