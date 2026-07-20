@@ -17,6 +17,8 @@ $Database = Join-Path $EvidenceRoot "research.db"
 $RestoredDatabase = Join-Path $EvidenceRoot "restored.db"
 $StoreResult = Join-Path $EvidenceRoot "discover-store.json"
 $ReviewWorksheet = Join-Path $EvidenceRoot "benchmark-review-worksheet.csv"
+$ResolvedReviewWorksheet = Join-Path $EvidenceRoot "benchmark-review-resolved.csv"
+$ImportedBenchmarkCorpus = Join-Path $EvidenceRoot "benchmark-review-imported.jsonl"
 $RedditFixture = Join-Path $ProjectPath "tests\fixtures\reddit_thread.html"
 $Fixture = Join-Path $ProjectPath "tests\fixtures\imported_evidence.jsonl"
 $BenchmarkCorpus = Join-Path $ProjectPath "tests\fixtures\benchmark_corpus.jsonl"
@@ -174,12 +176,48 @@ Invoke-CheckedNative -Step "Run restore" -Command {
         --database $RestoredDatabase
 } | Tee-Object -FilePath "$EvidenceRoot\restore-run.txt"
 
-Write-Host "[9/12] Benchmark review worksheet" -ForegroundColor Cyan
+Write-Host "[9/12] Benchmark review worksheet and import" -ForegroundColor Cyan
 Invoke-CheckedNative -Step "Benchmark review worksheet" -Command {
     & $Python -m painfinder benchmark prepare-review `
         --run-id $RunId `
         --database $Database `
         --output $ReviewWorksheet
+}
+
+$ReviewRows = @(Import-Csv $ReviewWorksheet)
+if ($ReviewRows.Count -lt 1) {
+    throw "Benchmark review worksheet contains no evidence rows."
+}
+$ReviewedAt = (Get-Date).ToUniversalTime().ToString("o")
+for ($Index = 0; $Index -lt $ReviewRows.Count; $Index++) {
+    $Row = $ReviewRows[$Index]
+    $Row.review_status = "resolved"
+    $Row.reviewer = "verification-harness"
+    $Row.reviewed_at = $ReviewedAt
+    $Row.rationale = "Deterministic verification label for review-import integration."
+    if ($Index -eq 0) {
+        $Row.expected_pain = "true"
+        $Row.expected_categories = "manual_work"
+        $Row.expected_cluster = "verification-workflow"
+    }
+    else {
+        $Row.expected_pain = "false"
+        $Row.expected_categories = ""
+        $Row.expected_cluster = ""
+    }
+}
+$ReviewRows | Export-Csv $ResolvedReviewWorksheet -NoTypeInformation -Encoding UTF8
+
+Invoke-CheckedNative -Step "Benchmark review import" -Command {
+    & $Python -m painfinder benchmark import-review `
+        --worksheet $ResolvedReviewWorksheet `
+        --output $ImportedBenchmarkCorpus
+}
+Invoke-CheckedNative -Step "Imported benchmark evaluation" -Command {
+    & $Python -m painfinder benchmark run `
+        --corpus $ImportedBenchmarkCorpus `
+        --json-output "$EvidenceRoot\benchmark-review-imported.json" `
+        --html-output "$EvidenceRoot\benchmark-review-imported.html"
 }
 
 Write-Host "[10/12] Benchmark evaluation" -ForegroundColor Cyan
@@ -225,6 +263,10 @@ $Manifest = [ordered]@{
         "reviewed-opportunities.html",
         "run-reviewed.zip",
         "benchmark-review-worksheet.csv",
+        "benchmark-review-resolved.csv",
+        "benchmark-review-imported.jsonl",
+        "benchmark-review-imported.json",
+        "benchmark-review-imported.html",
         "benchmark.json",
         "benchmark.html"
     )
