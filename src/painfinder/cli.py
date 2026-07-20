@@ -12,6 +12,7 @@ from painfinder.opportunity_report import write_opportunity_report
 from painfinder.playwright_collector import PlaywrightRedditCollector
 from painfinder.reddit_fixture import extract_thread_fixture
 from painfinder.report import write_html_report
+from painfinder.storage import SQLiteResearchRepository
 
 app = typer.Typer(no_args_is_help=True)
 
@@ -39,12 +40,7 @@ def discover(
     output: Annotated[Path, typer.Option()] = Path("output/opportunities.html"),
 ) -> None:
     """Import evidence and generate a ranked opportunity report."""
-    try:
-        imported = import_source_items(input)
-    except ImportFormatError as error:
-        typer.echo(f"ERROR: {error}")
-        raise typer.Exit(code=2) from error
-
+    imported = _import_or_exit(input)
     items = deduplicate_items(imported)
     signals = detect_pain_signals(items)
     clusters = build_opportunity_clusters(items, signals)
@@ -54,6 +50,55 @@ def discover(
         f"found {len(signals)} pain signal(s), built {len(clusters)} cluster(s)"
     )
     typer.echo(f"Report: {output}")
+
+
+@app.command("discover-store")
+def discover_store(
+    input: Annotated[Path, typer.Option(exists=True, readable=True)],
+    name: Annotated[str, typer.Option()],
+    database: Annotated[Path, typer.Option()] = Path("data/research.db"),
+    output: Annotated[Path, typer.Option()] = Path("output/opportunities.html"),
+) -> None:
+    """Run imported discovery and persist the complete research run."""
+    imported = _import_or_exit(input)
+    items = deduplicate_items(imported)
+    signals = detect_pain_signals(items)
+    clusters = build_opportunity_clusters(items, signals)
+
+    repository = SQLiteResearchRepository(database)
+    repository.initialize()
+    run = repository.create_run(name, status="processing")
+    repository.save_source_items(run.run_id, items)
+    repository.save_pain_signals(run.run_id, signals)
+    repository.save_clusters(run.run_id, clusters)
+    repository.set_run_status(run.run_id, "completed")
+
+    write_opportunity_report(output, items=items, clusters=clusters)
+    typer.echo(
+        f"PASS: stored run {run.run_id} with {len(items)} source item(s), "
+        f"{len(signals)} pain signal(s), and {len(clusters)} cluster(s)"
+    )
+    typer.echo(f"Database: {database}")
+    typer.echo(f"Report: {output}")
+
+
+@app.command("export-run")
+def export_run(
+    run_id: Annotated[str, typer.Option()],
+    database: Annotated[Path, typer.Option(exists=True, readable=True)] = Path(
+        "data/research.db"
+    ),
+    output: Annotated[Path, typer.Option()] = Path("output/research-run.zip"),
+) -> None:
+    """Export one persisted research run to a portable ZIP package."""
+    repository = SQLiteResearchRepository(database)
+    repository.initialize()
+    try:
+        repository.export_run(run_id, output)
+    except KeyError as error:
+        typer.echo(f"ERROR: {error.args[0]}")
+        raise typer.Exit(code=2) from error
+    typer.echo(f"PASS: exported run {run_id} to {output}")
 
 
 @app.command("live-smoke")
@@ -116,6 +161,14 @@ def live_smoke(
         f"stop_reason={stop_reason}"
     )
     typer.echo(f"Report: {report}")
+
+
+def _import_or_exit(path: Path) -> list:
+    try:
+        return import_source_items(path)
+    except ImportFormatError as error:
+        typer.echo(f"ERROR: {error}")
+        raise typer.Exit(code=2) from error
 
 
 if __name__ == "__main__":
