@@ -4,16 +4,17 @@ Local-first opportunity-discovery workbench for identifying evidence-backed cust
 
 ## Project status
 
-- **95% implemented toward the defined MVP on the open PR stack.**
+- **95% implemented and locally verified toward the defined MVP on the open PR stack.**
 - **62% remains the last fully verified-and-merged baseline.**
 
-The distinction is deliberate: implementation exists in review branches, while release readiness still requires the complete verification harness, one bounded official-source smoke run, working GitHub Actions, and ordered merges.
+Two complete Windows verification runs have passed: the full offline gate and the same gate with the bounded official Hacker News smoke enabled. Release readiness still requires GitHub Actions recovery, ordered merges and final verification from merged `main`.
 
 See:
 
 - [`docs/PROJECT_STATUS.md`](docs/PROJECT_STATUS.md) for the weighted completion model;
 - [`docs/ROADMAP.md`](docs/ROADMAP.md) for remaining milestones;
 - [`docs/VERIFICATION_CHECKLIST.md`](docs/VERIFICATION_CHECKLIST.md) for the quality gate;
+- [`docs/MERGE_RUNBOOK.md`](docs/MERGE_RUNBOOK.md) for the ordered merge and retarget procedure;
 - [`docs/STORAGE.md`](docs/STORAGE.md) for persistent runs and packages;
 - [`docs/ANALYST_REVIEW.md`](docs/ANALYST_REVIEW.md) for review decisions;
 - [`docs/BENCHMARKING.md`](docs/BENCHMARKING.md) for evaluator limits;
