@@ -68,19 +68,28 @@ Set-ExecutionPolicy -Scope Process Bypass
 
 ## Complete verification
 
-Run every offline quality and integration gate:
+From an existing clean checkout, synchronize the exact release-readiness branch and run every offline gate:
+
+```powershell
+powershell -ExecutionPolicy Bypass -File .\scripts\update-and-verify.ps1
+```
+
+The synchronization wrapper refuses to continue when local changes are present, fetches `origin`, resets the local `feat/release-readiness` branch to the exact remote commit, and then runs `verify-mvp.ps1`.
+
+Include one bounded call to the official Hacker News API:
+
+```powershell
+powershell -ExecutionPolicy Bypass -File .\scripts\update-and-verify.ps1 `
+  -IncludeHackerNewsSmoke
+```
+
+To run the quality and integration gate without changing branches:
 
 ```powershell
 .\scripts\verify-mvp.ps1
 ```
 
-Include one bounded call to the official Hacker News API:
-
-```powershell
-.\scripts\verify-mvp.ps1 -IncludeHackerNewsSmoke
-```
-
-The script writes a timestamped evidence package under `artifacts\verification\` and stops at the first failed gate.
+The verification script writes a timestamped evidence package under `artifacts\verification\` and stops at the first failed gate.
 
 ## Imported discovery
 
