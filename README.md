@@ -4,20 +4,20 @@ Local-first opportunity-discovery workbench for identifying evidence-backed cust
 
 ## Project status
 
-- **95% implemented and locally verified toward the defined MVP on the open PR stack.**
-- **62% remains the last fully verified-and-merged baseline.**
+- **95% implemented, merged and verified toward the defined MVP.**
+- **95% is now the fully verified-and-merged baseline on `main`.**
 
-Two complete Windows verification runs have passed: the full offline gate and the same gate with the bounded official Hacker News smoke enabled. Release readiness still requires GitHub Actions recovery, ordered merges and final verification from merged `main`.
+Merged `main` commit `39d6400f4e4a6a7cb79e83c70d7de1531055e34a` passed both complete Windows verification modes: the full offline gate and the same gate with the bounded official Hacker News smoke enabled. GitHub Actions issue #3 still fails before any workflow step or log is recorded, so the successful local gates were used as explicitly authorized temporary merge authority.
 
 See:
 
 - [`docs/PROJECT_STATUS.md`](docs/PROJECT_STATUS.md) for the weighted completion model;
 - [`docs/ROADMAP.md`](docs/ROADMAP.md) for remaining milestones;
 - [`docs/VERIFICATION_CHECKLIST.md`](docs/VERIFICATION_CHECKLIST.md) for the quality gate;
-- [`docs/MERGE_RUNBOOK.md`](docs/MERGE_RUNBOOK.md) for the ordered merge and retarget procedure;
+- [`docs/MERGE_RUNBOOK.md`](docs/MERGE_RUNBOOK.md) for the completed ordered integration procedure;
 - [`docs/STORAGE.md`](docs/STORAGE.md) for persistent runs and packages;
 - [`docs/ANALYST_REVIEW.md`](docs/ANALYST_REVIEW.md) for review decisions;
-- [`docs/BENCHMARKING.md`](docs/BENCHMARKING.md) for evaluator limits;
+- [`docs/BENCHMARKING.md`](docs/BENCHMARKING.md) for evaluator limits and review preparation;
 - [`docs/HACKER_NEWS_ADAPTER.md`](docs/HACKER_NEWS_ADAPTER.md) for the official second source.
 
 ## Current capabilities
@@ -32,11 +32,13 @@ See:
 - topic-first opportunity clustering and prioritization scoring;
 - canonical source links in machine-generated reports;
 - SQLite-backed research runs, signals, clusters and analyst decisions;
+- schema v1 to v2 migration with run-scoped indexes;
 - portable run export and restore;
 - stored-run listing and inspection commands;
 - analyst accept, reject, annotate, merge and split actions;
 - reviewed reports with append-only audit replay and stale-score warnings;
 - reviewed-corpus detector and clustering benchmarks;
+- stored-run export to an unlabeled human-review worksheet;
 - one-command local MVP verification with timestamped evidence.
 
 ## Current Reddit status
@@ -69,13 +71,13 @@ Set-ExecutionPolicy -Scope Process Bypass
 
 ## Complete verification
 
-From an existing clean checkout, synchronize the exact release-readiness branch and run every offline gate:
+From a clean checkout of `main`, run every offline gate:
 
 ```powershell
+git switch main
+git pull --ff-only origin main
 powershell -ExecutionPolicy Bypass -File .\scripts\update-and-verify.ps1
 ```
-
-The synchronization wrapper refuses to continue when local changes are present, fetches `origin`, resets the local `feat/release-readiness` branch to the exact remote commit, and then runs `verify-mvp.ps1`.
 
 Include one bounded call to the official Hacker News API:
 
@@ -84,7 +86,7 @@ powershell -ExecutionPolicy Bypass -File .\scripts\update-and-verify.ps1 `
   -IncludeHackerNewsSmoke
 ```
 
-To run the quality and integration gate without changing branches:
+To run the quality and integration gate without synchronizing branches:
 
 ```powershell
 .\scripts\verify-mvp.ps1
@@ -137,6 +139,17 @@ Inspect stored runs:
 ```
 
 ## Benchmark evaluation
+
+Prepare an unlabeled worksheet from a stored run:
+
+```powershell
+.\.venv\Scripts\python.exe -m painfinder benchmark prepare-review `
+  --run-id <RUN_ID> `
+  --database data\research.db `
+  --output output\benchmark-review-worksheet.csv
+```
+
+Evaluate a resolved reviewed corpus:
 
 ```powershell
 .\.venv\Scripts\python.exe -m painfinder benchmark run `
