@@ -10,6 +10,8 @@ from dataclasses import dataclass
 from datetime import UTC, datetime
 from pathlib import Path
 
+from pydantic import HttpUrl
+
 from painfinder.domain import PainCategory, PainSignal, SourceItem, SourceType
 from painfinder.opportunities import OpportunityCluster
 
@@ -238,7 +240,7 @@ class SQLiteResearchRepository:
                 title=str(row[2]),
                 body=str(row[3]),
                 subreddit=None if row[4] is None else str(row[4]),
-                canonical_url=str(row[5]),
+                canonical_url=HttpUrl(str(row[5])),
                 collected_at=datetime.fromisoformat(str(row[6])),
             )
             for row in rows
