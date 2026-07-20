@@ -7,6 +7,7 @@ import typer
 from painfinder.analysis import detect_pain_signals
 from painfinder.benchmark_cli import benchmark_app
 from painfinder.domain import ResearchRun, SourceItem
+from painfinder.hacker_news_cli import hacker_news_app
 from painfinder.importers import ImportFormatError, deduplicate_items, import_source_items
 from painfinder.opportunities import build_opportunity_clusters
 from painfinder.opportunity_report import write_opportunity_report
@@ -20,6 +21,7 @@ from painfinder.storage import SQLiteResearchRepository
 app = typer.Typer(no_args_is_help=True)
 app.add_typer(review_app, name="review")
 app.add_typer(benchmark_app, name="benchmark")
+app.add_typer(hacker_news_app, name="hacker-news")
 
 
 @app.callback()

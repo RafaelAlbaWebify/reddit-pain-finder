@@ -9,6 +9,7 @@ from painfinder.domain import ResearchRun
 
 class StopReason(StrEnum):
     BUDGET_EXHAUSTED = "budget_exhausted"
+    RUNTIME_EXHAUSTED = "runtime_exhausted"
     BLOCK_DETECTED = "block_detected"
     CAPTCHA_DETECTED = "captcha_detected"
     LOGIN_WALL = "login_wall"
