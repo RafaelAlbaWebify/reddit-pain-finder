@@ -88,6 +88,7 @@ def test_merge_preserves_all_source_evidence(tmp_path: Path) -> None:
     assert set(merged.cluster.source_ids) == {"one", "two", "three", "four"}
     assert set(merged.cluster.categories) == {"manual_work", "reliability"}
     assert set(merged.derived_from) == {"invoice-workflow", "invoice-errors"}
+    assert merged.score_recalculation_required is True
 
 
 def test_split_preserves_original_and_new_source_links(tmp_path: Path) -> None:
@@ -102,9 +103,13 @@ def test_split_preserves_original_and_new_source_links(tmp_path: Path) -> None:
     )
 
     reviewed = service.reviewed_clusters(run_id)
-    assert reviewed["invoice-workflow"].cluster.source_ids == ("one",)
-    assert reviewed["invoice-onboarding"].cluster.source_ids == ("two", "three")
-    assert reviewed["invoice-onboarding"].derived_from == ("invoice-workflow",)
+    original = reviewed["invoice-workflow"]
+    split = reviewed["invoice-onboarding"]
+    assert original.cluster.source_ids == ("one",)
+    assert split.cluster.source_ids == ("two", "three")
+    assert split.derived_from == ("invoice-workflow",)
+    assert original.score_recalculation_required is True
+    assert split.score_recalculation_required is True
 
 
 def test_invalid_review_actions_fail_without_writing_decisions(tmp_path: Path) -> None:
@@ -132,3 +137,16 @@ def test_invalid_review_actions_fail_without_writing_decisions(tmp_path: Path) -
         )
 
     assert repository.list_decisions(run_id) == []
+
+
+def test_corrupt_or_unknown_decisions_fail_loudly(tmp_path: Path) -> None:
+    repository, service, run_id = _service(tmp_path)
+    repository.record_decision(
+        run_id,
+        "invoice-workflow",
+        "unsupported-action",
+        new_value="{}",
+    )
+
+    with pytest.raises(RuntimeError, match="unsupported action"):
+        service.reviewed_clusters(run_id)
