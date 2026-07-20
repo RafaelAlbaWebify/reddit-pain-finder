@@ -3,8 +3,9 @@ from __future__ import annotations
 import json
 import time
 from dataclasses import dataclass
-from typing import Any, Protocol
+from typing import Any, Callable, Protocol
 from urllib.error import HTTPError, URLError
+from urllib.parse import urlparse
 from urllib.request import Request, urlopen
 
 from bs4 import BeautifulSoup
@@ -13,6 +14,7 @@ from painfinder.collection import CollectionBudget, StopReason
 from painfinder.domain import ResearchRun, SourceItem, SourceType
 
 API_BASE = "https://hacker-news.firebaseio.com/v0"
+API_HOST = "hacker-news.firebaseio.com"
 ALLOWED_FEEDS = {"topstories", "newstories", "beststories", "askstories"}
 
 
@@ -51,7 +53,7 @@ class HackerNewsCollector:
         self,
         *,
         transport: JsonTransport | None = None,
-        sleep: callable = time.sleep,
+        sleep: Callable[[float], None] = time.sleep,
     ) -> None:
         self.transport = transport or UrllibJsonTransport()
         self.sleep = sleep
@@ -95,12 +97,6 @@ class HackerNewsCollector:
             return HackerNewsCollectionResult(items, evidence, "malformed_response")
 
         for raw_story_id in story_ids:
-            if len(items) >= policy.max_threads:
-                return HackerNewsCollectionResult(
-                    items,
-                    evidence,
-                    StopReason.BUDGET_EXHAUSTED.value,
-                )
             if not isinstance(raw_story_id, int):
                 continue
             stop = budget.register_page(is_thread=True)
@@ -136,14 +132,17 @@ class HackerNewsCollector:
                 comment_url = f"{API_BASE}/item/{raw_comment_id}.json"
                 comment = self._fetch_item(comment_url, evidence)
                 if comment is None:
-                    if evidence and evidence[-1].status in {"blocked", "rate_limited"}:
+                    if evidence and evidence[-1].status in {
+                        "blocked",
+                        "rate_limited",
+                    }:
                         return HackerNewsCollectionResult(
                             items,
                             evidence,
                             evidence[-1].status,
                         )
                     continue
-                source_comment = _comment_to_source_item(comment, story_id=raw_story_id)
+                source_comment = _comment_to_source_item(comment)
                 if source_comment is None:
                     continue
                 items.append(source_comment)
@@ -162,7 +161,7 @@ class HackerNewsCollector:
         try:
             payload = self.transport.get_json(url)
         except HTTPError as error:
-            status = "rate_limited" if error.code == 429 else "blocked" if error.code == 403 else "http_error"
+            status = _http_status(error.code)
             evidence.append(HackerNewsEvidence(url, status, f"HTTP {error.code}"))
             return None
         except (URLError, TimeoutError, OSError, json.JSONDecodeError) as error:
@@ -183,9 +182,17 @@ class HackerNewsCollector:
         items: list[SourceItem],
         evidence: list[HackerNewsEvidence],
     ) -> HackerNewsCollectionResult:
-        status = "rate_limited" if error.code == 429 else "blocked" if error.code == 403 else "http_error"
+        status = _http_status(error.code)
         evidence.append(HackerNewsEvidence(url, status, f"HTTP {error.code}"))
         return HackerNewsCollectionResult(items, evidence, status)
+
+
+def _http_status(code: int) -> str:
+    if code == 429:
+        return "rate_limited"
+    if code == 403:
+        return "blocked"
+    return "http_error"
 
 
 def _story_to_source_item(payload: dict[str, Any]) -> SourceItem | None:
@@ -196,22 +203,17 @@ def _story_to_source_item(payload: dict[str, Any]) -> SourceItem | None:
     text = _clean_html(payload.get("text"))
     if not isinstance(item_id, int) or not title:
         return None
-    body = text or title
     return SourceItem(
         external_id=f"hn-story-{item_id}",
         source_type=SourceType.POST,
         title=title,
-        body=body,
+        body=text or title,
         subreddit="hackernews",
         canonical_url=f"https://news.ycombinator.com/item?id={item_id}",
     )
 
 
-def _comment_to_source_item(
-    payload: dict[str, Any],
-    *,
-    story_id: int,
-) -> SourceItem | None:
+def _comment_to_source_item(payload: dict[str, Any]) -> SourceItem | None:
     if payload.get("deleted") or payload.get("dead"):
         return None
     item_id = payload.get("id")
@@ -224,9 +226,7 @@ def _comment_to_source_item(
         title="",
         body=text,
         subreddit="hackernews",
-        canonical_url=(
-            f"https://news.ycombinator.com/item?id={story_id}#comment-{item_id}"
-        ),
+        canonical_url=f"https://news.ycombinator.com/item?id={item_id}",
     )
 
 
@@ -243,5 +243,13 @@ def _clean_text(value: Any) -> str:
 
 
 def _ensure_allowed_url(url: str) -> None:
-    if not url.startswith(f"{API_BASE}/") or not url.endswith(".json"):
+    parsed = urlparse(url)
+    if (
+        parsed.scheme != "https"
+        or parsed.hostname != API_HOST
+        or not parsed.path.startswith("/v0/")
+        or not parsed.path.endswith(".json")
+        or parsed.params
+        or parsed.fragment
+    ):
         raise ValueError(f"URL outside approved Hacker News API is forbidden: {url}")
