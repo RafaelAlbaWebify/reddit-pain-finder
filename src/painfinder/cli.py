@@ -12,10 +12,12 @@ from painfinder.opportunity_report import write_opportunity_report
 from painfinder.playwright_collector import PlaywrightRedditCollector
 from painfinder.reddit_fixture import extract_thread_fixture
 from painfinder.report import write_html_report
+from painfinder.review_cli import review_app
 from painfinder.run_packages import RunPackageError, restore_run_package
 from painfinder.storage import SQLiteResearchRepository
 
 app = typer.Typer(no_args_is_help=True)
+app.add_typer(review_app, name="review")
 
 
 @app.callback()
