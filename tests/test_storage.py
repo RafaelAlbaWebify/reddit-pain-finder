@@ -111,6 +111,48 @@ def test_decision_audit_trail_and_export(tmp_path: Path) -> None:
     assert payload["decisions"][0]["action"] == "accept"
 
 
+def test_schema_version_one_is_migrated_without_data_loss(
+    tmp_path: Path,
+) -> None:
+    database = tmp_path / "research.db"
+    repository = SQLiteResearchRepository(database)
+    repository.initialize()
+    run = repository.create_run("Legacy run")
+
+    index_names = {
+        "idx_source_items_run_collected_at",
+        "idx_pain_signals_run_category",
+        "idx_opportunity_clusters_run_score",
+        "idx_analyst_decisions_run_created_at",
+    }
+
+    with sqlite3.connect(database) as connection:
+        connection.execute("UPDATE schema_version SET version = 1")
+        for index_name in index_names:
+            connection.execute(f"DROP INDEX {index_name}")
+
+    repository.initialize()
+
+    with sqlite3.connect(database) as connection:
+        version = connection.execute(
+            "SELECT version FROM schema_version LIMIT 1"
+        ).fetchone()
+        migrated_indexes = {
+            str(row[0])
+            for row in connection.execute(
+                """
+                SELECT name
+                FROM sqlite_master
+                WHERE type = 'index'
+                """
+            ).fetchall()
+        }
+
+    assert version == (SCHEMA_VERSION,)
+    assert index_names <= migrated_indexes
+    assert repository.get_run(run.run_id) == run
+
+
 def test_schema_version_mismatch_is_rejected(tmp_path: Path) -> None:
     database = tmp_path / "research.db"
     with sqlite3.connect(database) as connection:
