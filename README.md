@@ -2,6 +2,16 @@
 
 Local-first opportunity-discovery workbench for identifying evidence-backed customer pain hypotheses from bounded discussion research.
 
+## Project status
+
+**62% complete toward the defined local-first MVP.**
+
+See:
+
+- [`docs/PROJECT_STATUS.md`](docs/PROJECT_STATUS.md) for the weighted completion model;
+- [`docs/ROADMAP.md`](docs/ROADMAP.md) for remaining milestones;
+- [`docs/VERIFICATION_CHECKLIST.md`](docs/VERIFICATION_CHECKLIST.md) for the PR #2 merge gate.
+
 ## Current capabilities
 
 - bounded, read-only Playwright Reddit smoke collection;
@@ -9,9 +19,10 @@ Local-first opportunity-discovery workbench for identifying evidence-backed cust
 - screenshots and Playwright traces for browser evidence;
 - privacy-safe support bundles that exclude browser profiles and cookies;
 - JSONL and CSV evidence import;
-- deduplication by external ID and normalized content hash;
+- validation, normalization and deduplication;
 - deterministic pain-signal detection;
-- deterministic candidate clustering and opportunity scoring;
+- topic-first candidate clustering and opportunity scoring;
+- canonical source links in opportunity reports;
 - standalone HTML evidence and opportunity reports;
 - strict type checking, linting and automated tests.
 
@@ -54,7 +65,7 @@ Create a JSONL or CSV file using the templates under `examples/`, then run:
   --output output\opportunities.html
 ```
 
-The generated report ranks candidate pain clusters by evidence count, community independence, and detector confidence.
+The generated report ranks candidate pain clusters by unique source evidence, community coverage, and detector confidence.
 
 ## Fixture demo
 
@@ -84,9 +95,9 @@ bounded browser or imported evidence
     -> validated source items
     -> deduplication
     -> pain-signal detection
-    -> candidate clustering
+    -> topic-first candidate clustering
     -> opportunity scoring
-    -> evidence-backed HTML report
+    -> traceable HTML report
 ```
 
 The browser transport, imported evidence, analysis, clustering, and reporting layers remain separate so access failures do not halt product development.
