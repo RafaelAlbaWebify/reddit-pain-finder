@@ -90,3 +90,7 @@ def smoke(
     typer.echo(f"Report: {report}")
     typer.echo(f"Summary: {summary}")
     typer.echo(f"Evidence: {evidence_jsonl}")
+
+
+if __name__ == "__main__":
+    hacker_news_app()
