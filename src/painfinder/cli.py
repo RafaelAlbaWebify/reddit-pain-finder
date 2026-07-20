@@ -5,7 +5,7 @@ from typing import Annotated
 import typer
 
 from painfinder.analysis import detect_pain_signals
-from painfinder.domain import ResearchRun
+from painfinder.domain import ResearchRun, SourceItem
 from painfinder.importers import ImportFormatError, deduplicate_items, import_source_items
 from painfinder.opportunities import build_opportunity_clusters
 from painfinder.opportunity_report import write_opportunity_report
@@ -163,7 +163,7 @@ def live_smoke(
     typer.echo(f"Report: {report}")
 
 
-def _import_or_exit(path: Path) -> list:
+def _import_or_exit(path: Path) -> list[SourceItem]:
     try:
         return import_source_items(path)
     except ImportFormatError as error:
