@@ -15,6 +15,7 @@ $Stamp = Get-Date -Format "yyyyMMdd-HHmmss"
 $EvidenceRoot = Join-Path $ProjectPath "artifacts\verification\$Stamp"
 $Database = Join-Path $EvidenceRoot "research.db"
 $RestoredDatabase = Join-Path $EvidenceRoot "restored.db"
+$StoreResult = Join-Path $EvidenceRoot "discover-store.json"
 $RedditFixture = Join-Path $ProjectPath "tests\fixtures\reddit_thread.html"
 $Fixture = Join-Path $ProjectPath "tests\fixtures\imported_evidence.jsonl"
 $BenchmarkCorpus = Join-Path $ProjectPath "tests\fixtures\benchmark_corpus.jsonl"
@@ -88,21 +89,29 @@ Invoke-CheckedNative -Step "Imported discovery" -Command {
 }
 
 Write-Host "[6/11] Persisted discovery" -ForegroundColor Cyan
-$StoreOutput = Invoke-CheckedNative -Step "Persisted discovery" -Command {
+Invoke-CheckedNative -Step "Persisted discovery" -Command {
     & $Python -m painfinder discover-store `
         --input $Fixture `
         --name "MVP verification $Stamp" `
         --database $Database `
-        --output "$EvidenceRoot\stored-opportunities.html"
-}
-$StoreOutput | Tee-Object -FilePath "$EvidenceRoot\discover-store.log"
+        --output "$EvidenceRoot\stored-opportunities.html" `
+        --json-output $StoreResult
+} | Tee-Object -FilePath "$EvidenceRoot\discover-store.log"
 
-$StoreText = $StoreOutput | Out-String
-$RunMatch = [regex]::Match($StoreText, "stored run ([0-9a-f-]+)")
-if (-not $RunMatch.Success) {
-    throw "Could not extract stored run ID from discover-store output."
+if (-not (Test-Path $StoreResult)) {
+    throw "Persisted discovery did not write structured result: $StoreResult"
 }
-$RunId = $RunMatch.Groups[1].Value
+$StorePayload = Get-Content $StoreResult -Raw | ConvertFrom-Json
+$RunId = [string]$StorePayload.run_id
+if (-not $RunId) {
+    throw "Persisted discovery result did not contain a run ID."
+}
+if ($StorePayload.status -ne "completed") {
+    throw "Persisted discovery result was not completed: $($StorePayload.status)"
+}
+if ([int]$StorePayload.clusters -lt 1) {
+    throw "Persisted discovery produced no clusters to review."
+}
 
 Write-Host "[7/11] Run inspection" -ForegroundColor Cyan
 Invoke-CheckedNative -Step "Run list" -Command {
@@ -202,6 +211,7 @@ $Manifest = [ordered]@{
         "coverage.xml",
         "fixture-report.html",
         "opportunities.html",
+        "discover-store.json",
         "stored-opportunities.html",
         "reviewed-opportunities.html",
         "run-reviewed.zip",
