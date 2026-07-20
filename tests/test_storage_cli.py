@@ -17,6 +17,7 @@ FIXTURE = Path(__file__).parent / "fixtures" / "imported_evidence.jsonl"
 def test_discover_store_export_and_restore_run(tmp_path: Path) -> None:
     database = tmp_path / "research.db"
     report = tmp_path / "report.html"
+    result_file = tmp_path / "discover-store.json"
     result = CliRunner().invoke(
         app,
         [
@@ -29,15 +30,29 @@ def test_discover_store_export_and_restore_run(tmp_path: Path) -> None:
             str(database),
             "--output",
             str(report),
+            "--json-output",
+            str(result_file),
         ],
     )
 
     assert result.exit_code == 0
     assert database.exists()
     assert report.exists()
-    match = re.search(r"stored run ([0-9a-f-]+)", result.stdout)
-    assert match is not None
-    run_id = match.group(1)
+    assert result_file.exists()
+    result_payload = json.loads(result_file.read_text(encoding="utf-8"))
+    run_id = result_payload["run_id"]
+    assert result_payload == {
+        "run_id": run_id,
+        "name": "Stored discovery",
+        "status": "completed",
+        "database": str(database),
+        "report": str(report),
+        "source_items": 3,
+        "pain_signals": result_payload["pain_signals"],
+        "clusters": result_payload["clusters"],
+    }
+    assert result_payload["pain_signals"] > 0
+    assert result_payload["clusters"] > 0
 
     repository = SQLiteResearchRepository(database)
     repository.initialize()
