@@ -1,0 +1,150 @@
+from __future__ import annotations
+
+from typing import Any
+from urllib.error import HTTPError
+
+import pytest
+
+from painfinder.domain import ResearchRun, SourceType
+from painfinder.hacker_news import (
+    API_BASE,
+    HackerNewsCollector,
+    _ensure_allowed_url,
+)
+
+
+class FakeTransport:
+    def __init__(self, responses: dict[str, Any]) -> None:
+        self.responses = responses
+        self.calls: list[str] = []
+
+    def get_json(self, url: str) -> Any:
+        self.calls.append(url)
+        value = self.responses[url]
+        if isinstance(value, Exception):
+            raise value
+        return value
+
+
+def _policy(
+    *,
+    max_pages: int = 10,
+    max_threads: int = 2,
+    max_comments: int = 1,
+) -> ResearchRun:
+    return ResearchRun(
+        name="hn-test",
+        max_pages=max_pages,
+        max_threads=max_threads,
+        max_comments_per_thread=max_comments,
+        min_delay_seconds=0.5,
+        live_access_enabled=True,
+        concurrency=1,
+    )
+
+
+def test_collects_bounded_stories_and_comments() -> None:
+    feed = f"{API_BASE}/askstories.json"
+    story_one = f"{API_BASE}/item/1.json"
+    comment = f"{API_BASE}/item/11.json"
+    story_two = f"{API_BASE}/item/2.json"
+    transport = FakeTransport(
+        {
+            feed: [1, 2, 3],
+            story_one: {
+                "id": 1,
+                "title": "Ask HN: Invoice workflow",
+                "text": "We <b>manually</b> copy invoices into a spreadsheet.",
+                "kids": [11, 12],
+            },
+            comment: {
+                "id": 11,
+                "text": "Currently we use a spreadsheet workaround.",
+            },
+            story_two: {
+                "id": 2,
+                "title": "Ask HN: CRM imports",
+                "text": "Our CRM keeps failing during imports.",
+                "kids": [],
+            },
+        }
+    )
+    delays: list[float] = []
+
+    result = HackerNewsCollector(
+        transport=transport,
+        sleep=delays.append,
+    ).collect(policy=_policy(), feed="askstories")
+
+    assert result.stop_reason == "budget_exhausted"
+    assert [item.external_id for item in result.items] == [
+        "hn-story-1",
+        "hn-comment-11",
+        "hn-story-2",
+    ]
+    assert result.items[0].body == "We manually copy invoices into a spreadsheet."
+    assert result.items[1].source_type is SourceType.COMMENT
+    assert str(result.items[1].canonical_url) == (
+        "https://news.ycombinator.com/item?id=11"
+    )
+    assert f"{API_BASE}/item/12.json" not in transport.calls
+    assert delays == [0.5, 0.5, 0.5]
+
+
+def test_rate_limit_stops_collection() -> None:
+    feed = f"{API_BASE}/newstories.json"
+    story = f"{API_BASE}/item/1.json"
+    error = HTTPError(story, 429, "rate limited", hdrs=None, fp=None)
+    transport = FakeTransport({feed: [1], story: error})
+
+    result = HackerNewsCollector(
+        transport=transport,
+        sleep=lambda _: None,
+    ).collect(policy=_policy(), feed="newstories")
+
+    assert result.items == []
+    assert result.stop_reason == "rate_limited"
+    assert result.evidence[-1].detail == "HTTP 429"
+
+
+def test_malformed_feed_is_classified() -> None:
+    feed = f"{API_BASE}/beststories.json"
+    transport = FakeTransport({feed: {"not": "a list"}})
+
+    result = HackerNewsCollector(
+        transport=transport,
+        sleep=lambda _: None,
+    ).collect(policy=_policy(), feed="beststories")
+
+    assert result.stop_reason == "malformed_response"
+    assert result.evidence[-1].status == "malformed"
+
+
+def test_policy_and_host_boundaries_are_enforced() -> None:
+    collector = HackerNewsCollector(
+        transport=FakeTransport({}),
+        sleep=lambda _: None,
+    )
+    disabled = _policy().model_copy(update={"live_access_enabled": False})
+
+    with pytest.raises(ValueError, match="explicitly enabled"):
+        collector.collect(policy=disabled)
+    with pytest.raises(ValueError, match="Unsupported Hacker News feed"):
+        collector.collect(policy=_policy(), feed="unknown")
+    with pytest.raises(ValueError, match="outside approved"):
+        _ensure_allowed_url("https://example.com/v0/item/1.json")
+    with pytest.raises(ValueError, match="outside approved"):
+        _ensure_allowed_url("http://hacker-news.firebaseio.com/v0/item/1.json")
+
+
+def test_page_budget_stops_before_fetching_story() -> None:
+    feed = f"{API_BASE}/topstories.json"
+    transport = FakeTransport({feed: [1]})
+
+    result = HackerNewsCollector(
+        transport=transport,
+        sleep=lambda _: None,
+    ).collect(policy=_policy(max_pages=1), feed="topstories")
+
+    assert result.stop_reason == "budget_exhausted"
+    assert transport.calls == [feed]
