@@ -31,11 +31,17 @@ def write_review_report(
             for field, annotation in sorted(value.annotations.items())
         )
         derived = ", ".join(value.derived_from) or key
+        score_note = ""
+        if value.score_recalculation_required:
+            score_note = (
+                " <span class='warning'>(pre-review machine score; "
+                "recalculation required)</span>"
+            )
         cards.append(
             "<section class='card'>"
             f"<h2>{escape(cluster.label)}</h2>"
             f"<p><strong>Status:</strong> {escape(value.status.value)}</p>"
-            f"<p><strong>Score:</strong> {cluster.score:.1f}/100</p>"
+            f"<p><strong>Score:</strong> {cluster.score:.1f}/100{score_note}</p>"
             f"<p><strong>Derived from:</strong> {escape(derived)}</p>"
             f"<p><strong>Categories:</strong> "
             f"{escape(', '.join(cluster.categories))}</p>"
@@ -76,6 +82,7 @@ dl {{ display: grid; grid-template-columns: 180px 1fr; gap: 6px 16px; }}
 dt {{ font-weight: 700; }}
 dd {{ margin: 0; }}
 li {{ margin-bottom: 8px; }}
+.warning {{ font-weight: 600; color: #92400e; }}
 </style>
 </head>
 <body>

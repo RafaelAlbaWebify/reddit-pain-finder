@@ -13,6 +13,23 @@ Each line contains:
 
 Do not include usernames or unnecessary personal information in benchmark fixtures.
 
+Use [`BENCHMARK_REVIEW_PROTOCOL.md`](BENCHMARK_REVIEW_PROTOCOL.md) before expanding the corpus. Complete labels without looking at detector output, and convert only resolved reviewed rows into JSONL.
+
+## Prepare a review worksheet from a stored run
+
+Export persisted evidence into an unlabeled CSV worksheet:
+
+```powershell
+.\.venv\Scripts\python.exe -m painfinder benchmark prepare-review `
+  --run-id <RUN_ID> `
+  --database data\research.db `
+  --output output\benchmark-review-worksheet.csv
+```
+
+The command preserves evidence identity, title, body, community and canonical URL. It deliberately leaves pain, category and cluster labels blank and sets `review_status` to `unreviewed`.
+
+The static [`../examples/benchmark-review-worksheet.csv`](../examples/benchmark-review-worksheet.csv) remains a format example.
+
 ## Run the benchmark
 
 ```powershell
@@ -32,5 +49,7 @@ Do not include usernames or unnecessary personal information in benchmark fixtur
 - over-merged evidence pairs.
 
 The included fixture is deliberately small and proves evaluator behavior only. It is not a representative market corpus. Detector or clustering changes must eventually be compared on a larger reviewed corpus with multiple communities and workflows.
+
+Do not choose target thresholds from the included fixture. Establish thresholds only after the reviewed corpus meets the minimum quality conditions in the review protocol and the cost of false positives, false negatives, fragmentation and over-merging has been explicitly considered.
 
 Benchmark metrics do not measure market size, commercial demand, willingness to pay, or implementation feasibility.

@@ -16,12 +16,14 @@ from painfinder.reddit_fixture import extract_thread_fixture
 from painfinder.report import write_html_report
 from painfinder.review_cli import review_app
 from painfinder.run_packages import RunPackageError, restore_run_package
+from painfinder.runs_cli import runs_app
 from painfinder.storage import SQLiteResearchRepository
 
 app = typer.Typer(no_args_is_help=True)
 app.add_typer(review_app, name="review")
 app.add_typer(benchmark_app, name="benchmark")
 app.add_typer(hacker_news_app, name="hacker-news")
+app.add_typer(runs_app, name="runs")
 
 
 @app.callback()
@@ -65,6 +67,7 @@ def discover_store(
     name: Annotated[str, typer.Option()],
     database: Annotated[Path, typer.Option()] = Path("data/research.db"),
     output: Annotated[Path, typer.Option()] = Path("output/opportunities.html"),
+    json_output: Annotated[Path | None, typer.Option()] = None,
 ) -> None:
     """Run imported discovery and persist the complete research run."""
     imported = _import_or_exit(input)
@@ -81,12 +84,28 @@ def discover_store(
     repository.set_run_status(run.run_id, "completed")
 
     write_opportunity_report(output, items=items, clusters=clusters)
+    result = {
+        "run_id": run.run_id,
+        "name": run.name,
+        "status": "completed",
+        "database": str(database),
+        "report": str(output),
+        "source_items": len(items),
+        "pain_signals": len(signals),
+        "clusters": len(clusters),
+    }
+    if json_output is not None:
+        json_output.parent.mkdir(parents=True, exist_ok=True)
+        json_output.write_text(json.dumps(result, indent=2), encoding="utf-8")
+
     typer.echo(
         f"PASS: stored run {run.run_id} with {len(items)} source item(s), "
         f"{len(signals)} pain signal(s), and {len(clusters)} cluster(s)"
     )
     typer.echo(f"Database: {database}")
     typer.echo(f"Report: {output}")
+    if json_output is not None:
+        typer.echo(f"Result: {json_output}")
 
 
 @app.command("export-run")

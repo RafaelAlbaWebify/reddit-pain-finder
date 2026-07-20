@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import json
 import re
 import zipfile
 from pathlib import Path
@@ -7,7 +8,8 @@ from pathlib import Path
 from typer.testing import CliRunner
 
 from painfinder.cli import app
-from painfinder.storage import SQLiteResearchRepository
+from painfinder.run_catalog import SQLiteRunCatalog
+from painfinder.storage import SCHEMA_VERSION, SQLiteResearchRepository
 
 FIXTURE = Path(__file__).parent / "fixtures" / "imported_evidence.jsonl"
 
@@ -15,6 +17,7 @@ FIXTURE = Path(__file__).parent / "fixtures" / "imported_evidence.jsonl"
 def test_discover_store_export_and_restore_run(tmp_path: Path) -> None:
     database = tmp_path / "research.db"
     report = tmp_path / "report.html"
+    result_file = tmp_path / "discover-store.json"
     result = CliRunner().invoke(
         app,
         [
@@ -27,15 +30,29 @@ def test_discover_store_export_and_restore_run(tmp_path: Path) -> None:
             str(database),
             "--output",
             str(report),
+            "--json-output",
+            str(result_file),
         ],
     )
 
     assert result.exit_code == 0
     assert database.exists()
     assert report.exists()
-    match = re.search(r"stored run ([0-9a-f-]+)", result.stdout)
-    assert match is not None
-    run_id = match.group(1)
+    assert result_file.exists()
+    result_payload = json.loads(result_file.read_text(encoding="utf-8"))
+    run_id = result_payload["run_id"]
+    assert result_payload == {
+        "run_id": run_id,
+        "name": "Stored discovery",
+        "status": "completed",
+        "database": str(database),
+        "report": str(report),
+        "source_items": 3,
+        "pain_signals": result_payload["pain_signals"],
+        "clusters": result_payload["clusters"],
+    }
+    assert result_payload["pain_signals"] > 0
+    assert result_payload["clusters"] > 0
 
     repository = SQLiteResearchRepository(database)
     repository.initialize()
@@ -45,7 +62,15 @@ def test_discover_store_export_and_restore_run(tmp_path: Path) -> None:
     assert run.status == "completed"
     assert len(repository.list_source_items(run_id)) == 3
     assert repository.list_pain_signals(run_id)
-    assert repository.list_clusters(run_id)
+    clusters = repository.list_clusters(run_id)
+    assert clusters
+    original_decision = repository.record_decision(
+        run_id,
+        clusters[0].key,
+        "accept",
+        previous_value="unreviewed",
+        new_value="accepted",
+    )
 
     archive = tmp_path / "run.zip"
     export = CliRunner().invoke(
@@ -93,6 +118,10 @@ def test_discover_store_export_and_restore_run(tmp_path: Path) -> None:
     assert len(restored.list_source_items(restored_run_id)) == 3
     assert restored.list_pain_signals(restored_run_id)
     assert restored.list_clusters(restored_run_id)
+    restored_decisions = restored.list_decisions(restored_run_id)
+    assert len(restored_decisions) == 1
+    assert restored_decisions[0].action == "accept"
+    assert restored_decisions[0].created_at == original_decision.created_at
 
 
 def test_export_unknown_run_returns_concise_error(tmp_path: Path) -> None:
@@ -134,3 +163,48 @@ def test_restore_invalid_package_returns_concise_error(tmp_path: Path) -> None:
 
     assert result.exit_code == 2
     assert "ERROR: Invalid run package" in result.stdout
+
+
+def test_malformed_decision_is_rejected_before_run_creation(tmp_path: Path) -> None:
+    package = tmp_path / "bad-decision.zip"
+    payload = {
+        "schema_version": SCHEMA_VERSION,
+        "run": {
+            "run_id": "source-run",
+            "name": "Bad decision package",
+            "created_at": "2026-07-20T00:00:00+00:00",
+            "status": "completed",
+        },
+        "source_items": [],
+        "pain_signals": [],
+        "clusters": [],
+        "decisions": [
+            {
+                "decision_id": "decision-one",
+                "run_id": "source-run",
+                "cluster_key": "missing-cluster",
+                "action": "accept",
+                "previous_value": "unreviewed",
+                "new_value": "accepted",
+                "created_at": "not-a-date",
+            }
+        ],
+    }
+    with zipfile.ZipFile(package, "w") as archive:
+        archive.writestr("run.json", json.dumps(payload))
+
+    database = tmp_path / "restored.db"
+    result = CliRunner().invoke(
+        app,
+        [
+            "restore-run",
+            "--package",
+            str(package),
+            "--database",
+            str(database),
+        ],
+    )
+
+    assert result.exit_code == 2
+    assert "ERROR: Invalid run package content" in result.stdout
+    assert SQLiteRunCatalog(database).list_runs() == []

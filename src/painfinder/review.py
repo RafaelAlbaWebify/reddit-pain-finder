@@ -29,6 +29,7 @@ class ReviewedCluster:
     status: ReviewStatus = ReviewStatus.UNREVIEWED
     annotations: dict[str, str] = field(default_factory=dict)
     derived_from: tuple[str, ...] = ()
+    score_recalculation_required: bool = False
 
 
 class AnalystReviewService:
@@ -113,17 +114,20 @@ class AnalystReviewService:
         cluster = self._required_cluster(run_id, cluster_key)
         clean_new_key = new_key.strip()
         clean_label = label.strip()
-        selected = tuple(sorted({value.strip() for value in source_ids if value.strip()}))
+        requested = {value.strip() for value in source_ids if value.strip()}
         if not clean_new_key or not clean_label:
             raise ValueError("Split key and label must not be blank")
         if clean_new_key in self.reviewed_clusters(run_id):
             raise ValueError(f"Cluster key already exists: {clean_new_key}")
-        if not selected:
+        if not requested:
             raise ValueError("A split requires at least one source item")
-        if not set(selected).issubset(cluster.source_ids):
+        if not requested.issubset(cluster.source_ids):
             raise ValueError("Split source IDs must belong to the original cluster")
-        if set(selected) == set(cluster.source_ids):
+        if requested == set(cluster.source_ids):
             raise ValueError("A split must leave evidence in the original cluster")
+        selected = tuple(
+            source_id for source_id in cluster.source_ids if source_id in requested
+        )
         payload = json.dumps(
             {
                 "new_key": clean_new_key,
@@ -157,7 +161,10 @@ class AnalystReviewService:
     ) -> None:
         current = reviewed.get(decision.cluster_key)
         if current is None:
-            return
+            raise RuntimeError(
+                f"Decision {decision.decision_id} references unavailable cluster "
+                f"{decision.cluster_key}"
+            )
         if decision.action == ReviewAction.ACCEPT.value:
             reviewed[decision.cluster_key] = replace(
                 current,
@@ -172,8 +179,10 @@ class AnalystReviewService:
             return
         if decision.action == ReviewAction.ANNOTATE.value:
             payload = _payload(decision)
+            field_name = _required_payload_text(payload, "field", decision)
+            annotation = _required_payload_text(payload, "value", decision)
             annotations = dict(current.annotations)
-            annotations[str(payload["field"])] = str(payload["value"])
+            annotations[field_name] = annotation
             reviewed[decision.cluster_key] = replace(
                 current,
                 annotations=annotations,
@@ -181,25 +190,37 @@ class AnalystReviewService:
             return
         if decision.action == ReviewAction.MERGE.value:
             payload = _payload(decision)
-            source_key = str(payload["source_key"])
+            source_key = _required_payload_text(payload, "source_key", decision)
             source = reviewed.get(source_key)
             if source is None:
-                return
+                raise RuntimeError(
+                    f"Decision {decision.decision_id} references unavailable merge source "
+                    f"{source_key}"
+                )
             reviewed[decision.cluster_key] = replace(
                 current,
                 cluster=_merge_clusters(current.cluster, source.cluster),
                 derived_from=tuple(
                     sorted(set(current.derived_from) | set(source.derived_from))
                 ),
+                score_recalculation_required=True,
             )
             del reviewed[source_key]
             return
         if decision.action == ReviewAction.SPLIT.value:
             payload = _payload(decision)
-            selected = tuple(str(value) for value in payload["source_ids"])
+            selected = _payload_source_ids(payload, decision)
+            if not set(selected).issubset(current.cluster.source_ids):
+                raise RuntimeError(
+                    f"Decision {decision.decision_id} split evidence is unavailable"
+                )
             remaining = tuple(
                 value for value in current.cluster.source_ids if value not in selected
             )
+            if not remaining:
+                raise RuntimeError(
+                    f"Decision {decision.decision_id} leaves no evidence in original cluster"
+                )
             reviewed[decision.cluster_key] = replace(
                 current,
                 cluster=replace(
@@ -207,19 +228,29 @@ class AnalystReviewService:
                     source_ids=remaining,
                     evidence_count=len(remaining),
                 ),
+                score_recalculation_required=True,
             )
-            new_key = str(payload["new_key"])
+            new_key = _required_payload_text(payload, "new_key", decision)
+            if new_key in reviewed:
+                raise RuntimeError(
+                    f"Decision {decision.decision_id} reuses cluster key {new_key}"
+                )
             new_cluster = replace(
                 current.cluster,
                 key=new_key,
-                label=str(payload["label"]),
+                label=_required_payload_text(payload, "label", decision),
                 source_ids=selected,
                 evidence_count=len(selected),
             )
             reviewed[new_key] = ReviewedCluster(
                 cluster=new_cluster,
                 derived_from=current.derived_from,
+                score_recalculation_required=True,
             )
+            return
+        raise RuntimeError(
+            f"Decision {decision.decision_id} has unsupported action {decision.action}"
+        )
 
     def _required_cluster(self, run_id: str, cluster_key: str) -> OpportunityCluster:
         clusters = self.reviewed_clusters(run_id)
@@ -232,10 +263,49 @@ class AnalystReviewService:
 def _payload(decision: AnalystDecision) -> dict[str, Any]:
     if decision.new_value is None:
         raise RuntimeError(f"Decision {decision.decision_id} has no payload")
-    value = json.loads(decision.new_value)
+    try:
+        value = json.loads(decision.new_value)
+    except json.JSONDecodeError as error:
+        raise RuntimeError(
+            f"Decision {decision.decision_id} payload is invalid JSON"
+        ) from error
     if not isinstance(value, dict):
         raise RuntimeError(f"Decision {decision.decision_id} payload is invalid")
     return value
+
+
+def _required_payload_text(
+    payload: dict[str, Any],
+    key: str,
+    decision: AnalystDecision,
+) -> str:
+    value = payload.get(key)
+    if not isinstance(value, str) or not value.strip():
+        raise RuntimeError(
+            f"Decision {decision.decision_id} payload field {key} is invalid"
+        )
+    return value.strip()
+
+
+def _payload_source_ids(
+    payload: dict[str, Any],
+    decision: AnalystDecision,
+) -> tuple[str, ...]:
+    value = payload.get("source_ids")
+    if not isinstance(value, list):
+        raise RuntimeError(
+            f"Decision {decision.decision_id} payload field source_ids is invalid"
+        )
+    selected = tuple(
+        item.strip()
+        for item in value
+        if isinstance(item, str) and item.strip()
+    )
+    if not selected or len(selected) != len(value) or len(set(selected)) != len(selected):
+        raise RuntimeError(
+            f"Decision {decision.decision_id} payload field source_ids is invalid"
+        )
+    return selected
 
 
 def _merge_clusters(

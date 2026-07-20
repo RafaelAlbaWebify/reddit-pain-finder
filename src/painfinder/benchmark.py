@@ -214,7 +214,12 @@ def _html_report(result: BenchmarkResult) -> str:
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Reddit Pain Finder — Benchmark Evaluation</title>
 <style>
-body {{ font-family: system-ui, sans-serif; max-width: 1000px; margin: 40px auto; padding: 0 20px; }}
+body {{
+  font-family: system-ui, sans-serif;
+  max-width: 1000px;
+  margin: 40px auto;
+  padding: 0 20px;
+}}
 section {{ border: 1px solid #d9dde5; border-radius: 12px; padding: 20px; margin-bottom: 16px; }}
 table {{ border-collapse: collapse; width: 100%; }}
 th, td {{ border: 1px solid #d9dde5; padding: 8px; text-align: left; }}

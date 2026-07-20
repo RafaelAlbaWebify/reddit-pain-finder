@@ -4,16 +4,18 @@ import json
 import sqlite3
 import uuid
 import zipfile
+from collections.abc import Iterator
 from contextlib import contextmanager
 from dataclasses import dataclass
 from datetime import UTC, datetime
 from pathlib import Path
-from typing import Iterator
+
+from pydantic import HttpUrl
 
 from painfinder.domain import PainCategory, PainSignal, SourceItem, SourceType
 from painfinder.opportunities import OpportunityCluster
 
-SCHEMA_VERSION = 1
+SCHEMA_VERSION = 2
 
 
 @dataclass(frozen=True)
@@ -123,15 +125,54 @@ class SQLiteResearchRepository:
                 "SELECT version FROM schema_version LIMIT 1"
             ).fetchone()
             if version is None:
+                self._ensure_v2_indexes(connection)
                 connection.execute(
                     "INSERT INTO schema_version(version) VALUES (?)",
                     (SCHEMA_VERSION,),
                 )
-            elif int(version[0]) != SCHEMA_VERSION:
+                return
+
+            current_version = int(version[0])
+            if current_version == 1:
+                self._migrate_v1_to_v2(connection)
+            elif current_version == SCHEMA_VERSION:
+                self._ensure_v2_indexes(connection)
+            else:
                 raise RuntimeError(
                     f"Unsupported database schema version {version[0]}; "
                     f"expected {SCHEMA_VERSION}"
                 )
+
+    @staticmethod
+    def _ensure_v2_indexes(connection: sqlite3.Connection) -> None:
+        connection.executescript(
+            """
+            CREATE INDEX IF NOT EXISTS idx_source_items_run_collected_at
+                ON source_items(run_id, collected_at);
+
+            CREATE INDEX IF NOT EXISTS idx_pain_signals_run_category
+                ON pain_signals(run_id, category);
+
+            CREATE INDEX IF NOT EXISTS idx_opportunity_clusters_run_score
+                ON opportunity_clusters(run_id, score DESC);
+
+            CREATE INDEX IF NOT EXISTS idx_analyst_decisions_run_created_at
+                ON analyst_decisions(run_id, created_at);
+            """
+        )
+
+    def _migrate_v1_to_v2(self, connection: sqlite3.Connection) -> None:
+        self._ensure_v2_indexes(connection)
+        cursor = connection.execute(
+            """
+            UPDATE schema_version
+            SET version = ?
+            WHERE version = 1
+            """,
+            (SCHEMA_VERSION,),
+        )
+        if cursor.rowcount != 1:
+            raise RuntimeError("Schema migration from version 1 to 2 failed")
 
     def create_run(self, name: str, *, status: str = "created") -> StoredRun:
         clean_name = name.strip()
@@ -238,7 +279,7 @@ class SQLiteResearchRepository:
                 title=str(row[2]),
                 body=str(row[3]),
                 subreddit=None if row[4] is None else str(row[4]),
-                canonical_url=str(row[5]),
+                canonical_url=HttpUrl(str(row[5])),
                 collected_at=datetime.fromisoformat(str(row[6])),
             )
             for row in rows

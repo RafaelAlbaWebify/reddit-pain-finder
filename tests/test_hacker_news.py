@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+import json
+from pathlib import Path
 from typing import Any
 from urllib.error import HTTPError
 
@@ -7,10 +9,12 @@ import pytest
 from typer.testing import CliRunner
 
 from painfinder.cli import app
-from painfinder.domain import ResearchRun, SourceType
+from painfinder.domain import ResearchRun, SourceItem, SourceType
 from painfinder.hacker_news import (
     API_BASE,
+    HackerNewsCollectionResult,
     HackerNewsCollector,
+    HackerNewsEvidence,
     _ensure_allowed_url,
 )
 
@@ -182,3 +186,88 @@ def test_hacker_news_commands_are_registered_in_main_cli() -> None:
 
     assert result.exit_code == 0
     assert "smoke" in result.stdout
+
+
+def test_hacker_news_smoke_writes_standard_artifacts(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    item = SourceItem(
+        external_id="hn-story-1",
+        source_type=SourceType.POST,
+        title="Ask HN: Invoice workflow",
+        body="We manually copy invoices into a spreadsheet every month.",
+        subreddit="hackernews",
+        canonical_url="https://news.ycombinator.com/item?id=1",
+    )
+    collection = HackerNewsCollectionResult(
+        items=[item],
+        evidence=[
+            HackerNewsEvidence(
+                url=f"{API_BASE}/item/1.json",
+                status="ok",
+                detail="item fetched",
+            )
+        ],
+        stop_reason=None,
+    )
+
+    class FakeCollector:
+        def collect(
+            self,
+            *,
+            policy: ResearchRun,
+            feed: str,
+        ) -> HackerNewsCollectionResult:
+            assert policy.live_access_enabled is True
+            assert feed == "askstories"
+            return collection
+
+    monkeypatch.setattr(
+        "painfinder.hacker_news_cli.HackerNewsCollector",
+        FakeCollector,
+    )
+    artifacts = tmp_path / "hn"
+    result = CliRunner().invoke(
+        app,
+        [
+            "hacker-news",
+            "smoke",
+            "--feed",
+            "askstories",
+            "--max-threads",
+            "1",
+            "--max-comments",
+            "0",
+            "--artifacts-dir",
+            str(artifacts),
+        ],
+    )
+
+    assert result.exit_code == 0
+    assert "collected 1 item(s)" in result.stdout
+    summary = json.loads(
+        (artifacts / "collection-result.json").read_text(encoding="utf-8")
+    )
+    assert summary["source"] == "hacker_news"
+    assert summary["stop_reason"] == "completed"
+    assert (artifacts / "source-items.jsonl").exists()
+    report = (artifacts / "opportunities.html").read_text(encoding="utf-8")
+    assert "Opportunity Discovery Report" in report
+
+
+def test_hacker_news_cli_rejects_unknown_feed(tmp_path: Path) -> None:
+    result = CliRunner().invoke(
+        app,
+        [
+            "hacker-news",
+            "smoke",
+            "--feed",
+            "unsupported",
+            "--artifacts-dir",
+            str(tmp_path),
+        ],
+    )
+
+    assert result.exit_code == 2
+    assert "unsupported feed" in result.stdout
