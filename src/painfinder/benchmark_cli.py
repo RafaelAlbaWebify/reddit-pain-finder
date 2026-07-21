@@ -24,6 +24,7 @@ from painfinder.benchmark_review_import import (
     import_review_worksheet,
 )
 from painfinder.benchmark_sampling import SamplingError, prepare_blind_review_packets
+from painfinder.human_approval import HumanApprovalError, promote_human_approvals
 from painfinder.provisional_review import ProvisionalReviewError, build_provisional_review
 from painfinder.storage import SQLiteResearchRepository
 
@@ -167,6 +168,35 @@ def build_provisional_review_command(
     typer.echo(f"Provisional: {provisional_output}")
     typer.echo(f"Approval queue: {approval_queue_output}")
     typer.echo(f"Summary: {summary_output}")
+
+
+@benchmark_app.command("promote-human-approvals")
+def promote_human_approvals_command(
+    approval_queue: Annotated[Path, typer.Option(exists=True, readable=True)],
+    resolved_worksheet_output: Annotated[Path, typer.Option()] = Path(
+        "output/human-approved-review.csv"
+    ),
+    gold_corpus_output: Annotated[Path, typer.Option()] = Path(
+        "output/human-approved-gold-corpus.jsonl"
+    ),
+) -> None:
+    """Promote explicitly human-approved rows into a separate gold corpus."""
+    try:
+        approved_count, excluded_count = promote_human_approvals(
+            approval_queue,
+            resolved_worksheet_output=resolved_worksheet_output,
+            gold_corpus_output=gold_corpus_output,
+        )
+    except HumanApprovalError as error:
+        typer.echo(f"ERROR: {error}")
+        raise typer.Exit(code=2) from error
+
+    typer.echo(
+        f"PASS: promoted {approved_count} human-approved row(s); "
+        f"excluded={excluded_count}"
+    )
+    typer.echo(f"Resolved worksheet: {resolved_worksheet_output}")
+    typer.echo(f"Gold corpus: {gold_corpus_output}")
 
 
 @benchmark_app.command("import-review")
