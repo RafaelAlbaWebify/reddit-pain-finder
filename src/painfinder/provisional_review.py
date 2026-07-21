@@ -190,9 +190,7 @@ def _detector_predictions(
     except ValidationError as error:
         raise ProvisionalReviewError(f"Blind packet contains invalid evidence: {error}") from error
 
-    categories_by_id: dict[str, set[PainCategory]] = {
-        item.external_id: set() for item in items
-    }
+    categories_by_id: dict[str, set[PainCategory]] = {item.external_id: set() for item in items}
     for signal in detect_pain_signals(items):
         categories_by_id[signal.source_external_id].add(signal.category)
     return {
@@ -280,7 +278,8 @@ def _output_row(
         ),
         "detector_pain": str(detector_pain).lower(),
         "detector_categories": ",".join(
-            category.value for category in sorted(
+            category.value
+            for category in sorted(
                 detector_categories,
                 key=lambda value: value.value,
             )
