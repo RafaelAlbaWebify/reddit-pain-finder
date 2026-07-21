@@ -48,11 +48,12 @@ Cluster IDs are reviewed topic identities, not detector keys.
 
 Human reviewers remain responsible only for semantic labels and dispute resolution. The project automates the surrounding evidence controls.
 
-1. Generate balanced, deduplicated and identical blind reviewer packets from a stored run:
+1. Generate balanced, deduplicated and identical blind reviewer packets from one or more completed stored runs:
 
 ```powershell
 .\.venv\Scripts\python.exe -m painfinder benchmark prepare-blind-review `
-  --run-id <RUN_ID> `
+  --run-id <FIRST_RUN_ID> `
+  --run-id <SECOND_RUN_ID> `
   --database data\research.db `
   --sample-size 100 `
   --reviewer-a-output output\reviewer-a.csv `
@@ -60,7 +61,9 @@ Human reviewers remain responsible only for semantic labels and dispute resoluti
   --manifest-output output\review-sampling.json
 ```
 
-The sampler is deterministic. It balances across available community and source-type buckets, removes exact and near-duplicate content, leaves every label blank, and writes a manifest containing the selected IDs and exclusion counts. It does not use detector output or create labels.
+Repeat `--run-id` for every completed run that should contribute evidence. Single-run packets preserve the original external IDs. Multi-run packets use deterministic composite packet IDs so identical external IDs from different runs remain distinct. The manifest maps every selected packet ID back to its original run ID and external ID.
+
+The sampler is deterministic. It balances across available run, community and source-type buckets, removes exact and near-duplicate content across all selected runs, leaves every label blank, and writes exclusion counts and provenance to the manifest. It rejects unknown or incomplete runs before creating any output. It does not use detector output or create labels.
 
 2. Reviewers label their copies independently without detector output.
 3. Compare the worksheets:
