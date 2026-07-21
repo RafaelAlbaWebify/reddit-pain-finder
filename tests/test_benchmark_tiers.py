@@ -48,7 +48,8 @@ def _inputs(tmp_path: Path, label: str) -> tuple[Path, Path]:
                 "expected_categories": [],
                 "expected_cluster": None,
             }
-        ) + "\n",
+        )
+        + "\n",
         encoding="utf-8",
     )
     return provisional, gold

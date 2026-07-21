@@ -112,7 +112,7 @@ def _html(payload: dict[str, Any]) -> str:
     return f"""<!doctype html>
 <html lang="en"><head><meta charset="utf-8"><title>Tiered benchmark</title></head>
 <body><h1>Tiered benchmark</h1>
-<p><strong>Warning:</strong> {payload['warning']}</p>
+<p><strong>Warning:</strong> {payload["warning"]}</p>
 <h2>Provisional AI consensus</h2><pre>{json.dumps(provisional, indent=2)}</pre>
 <h2>Human-approved gold corpus</h2><pre>{json.dumps(gold, indent=2)}</pre>
 </body></html>"""
@@ -147,10 +147,7 @@ def main() -> int:
         return 2
     provisional_count = payload["provisional"]["result"]["case_count"]
     gold_count = payload["gold"]["result"]["case_count"]
-    print(
-        f"PASS: reported provisional={provisional_count} and "
-        f"human-approved={gold_count} case(s)"
-    )
+    print(f"PASS: reported provisional={provisional_count} and human-approved={gold_count} case(s)")
     print(f"JSON: {arguments.json_output}")
     print(f"HTML: {arguments.html_output}")
     return 0
