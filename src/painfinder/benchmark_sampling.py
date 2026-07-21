@@ -71,12 +71,8 @@ def prepare_blind_review_packets(
         selected_count=len(selected),
         excluded_exact_duplicates=exact_count,
         excluded_near_duplicates=near_count,
-        communities=tuple(
-            sorted({candidate.item.subreddit or "(none)" for candidate in selected})
-        ),
-        source_types=tuple(
-            sorted({candidate.item.source_type.value for candidate in selected})
-        ),
+        communities=tuple(sorted({candidate.item.subreddit or "(none)" for candidate in selected})),
+        source_types=tuple(sorted({candidate.item.source_type.value for candidate in selected})),
         selected_ids=tuple(candidate.packet_id for candidate in selected),
         selected_items=tuple(
             {
@@ -136,7 +132,7 @@ def _load_candidates(
 
 
 def _multi_run_packet_id(run_id: str, external_id: str) -> str:
-    identity = f"{run_id}\0{external_id}".encode("utf-8")
+    identity = f"{run_id}\0{external_id}".encode()
     return f"sample-{sha256(identity).hexdigest()[:20]}"
 
 
@@ -173,17 +169,13 @@ def _balanced_sample(
     candidates: list[SamplingCandidate],
     sample_size: int,
 ) -> list[SamplingCandidate]:
-    buckets: dict[tuple[str, str, SourceType], deque[SamplingCandidate]] = defaultdict(
-        deque
-    )
+    buckets: dict[tuple[str, str, SourceType], deque[SamplingCandidate]] = defaultdict(deque)
     for candidate in sorted(
         candidates,
         key=lambda value: (value.run_id, value.item.external_id),
     ):
         item = candidate.item
-        buckets[(candidate.run_id, item.subreddit or "", item.source_type)].append(
-            candidate
-        )
+        buckets[(candidate.run_id, item.subreddit or "", item.source_type)].append(candidate)
 
     selected: list[SamplingCandidate] = []
     keys = deque(
