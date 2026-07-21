@@ -32,20 +32,31 @@ def promote_human_approvals(
 ) -> tuple[int, int]:
     approved_rows, excluded_count = _load_approved_rows(approval_queue)
     resolved_worksheet_output.parent.mkdir(parents=True, exist_ok=True)
-    with resolved_worksheet_output.open("w", encoding="utf-8", newline="") as handle:
+    gold_corpus_output.parent.mkdir(parents=True, exist_ok=True)
+    temporary_worksheet = resolved_worksheet_output.with_suffix(
+        resolved_worksheet_output.suffix + ".tmp"
+    )
+    temporary_corpus = gold_corpus_output.with_suffix(gold_corpus_output.suffix + ".tmp")
+
+    temporary_worksheet.unlink(missing_ok=True)
+    temporary_corpus.unlink(missing_ok=True)
+    with temporary_worksheet.open("w", encoding="utf-8", newline="") as handle:
         writer = csv.DictWriter(handle, fieldnames=REVIEW_COLUMNS)
         writer.writeheader()
         writer.writerows(approved_rows)
 
     try:
         approved_count = import_review_worksheet(
-            resolved_worksheet_output,
-            gold_corpus_output,
+            temporary_worksheet,
+            temporary_corpus,
         )
     except ReviewWorksheetError as error:
-        resolved_worksheet_output.unlink(missing_ok=True)
-        gold_corpus_output.unlink(missing_ok=True)
+        temporary_worksheet.unlink(missing_ok=True)
+        temporary_corpus.unlink(missing_ok=True)
         raise HumanApprovalError(str(error)) from error
+
+    temporary_worksheet.replace(resolved_worksheet_output)
+    temporary_corpus.replace(gold_corpus_output)
     return approved_count, excluded_count
 
 
