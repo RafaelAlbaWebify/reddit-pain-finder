@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import argparse
 import csv
 import json
 from dataclasses import asdict
@@ -109,3 +110,45 @@ def _html(payload: dict[str, object]) -> str:
 <h2>Provisional AI consensus</h2><pre>{json.dumps(provisional, indent=2)}</pre>
 <h2>Human-approved gold corpus</h2><pre>{json.dumps(gold, indent=2)}</pre>
 </body></html>"""
+
+
+def main() -> int:
+    parser = argparse.ArgumentParser(
+        description="Report provisional and human-approved benchmark metrics separately."
+    )
+    parser.add_argument("--provisional-csv", type=Path, required=True)
+    parser.add_argument("--gold-corpus", type=Path, required=True)
+    parser.add_argument(
+        "--json-output",
+        type=Path,
+        default=Path("output/tiered-benchmark.json"),
+    )
+    parser.add_argument(
+        "--html-output",
+        type=Path,
+        default=Path("output/tiered-benchmark.html"),
+    )
+    arguments = parser.parse_args()
+    try:
+        payload = write_tiered_benchmark_report(
+            arguments.provisional_csv,
+            arguments.gold_corpus,
+            json_output=arguments.json_output,
+            html_output=arguments.html_output,
+        )
+    except (TieredBenchmarkError, OSError, ValueError) as error:
+        print(f"ERROR: {error}")
+        return 2
+    provisional_count = payload["provisional"]["result"]["case_count"]
+    gold_count = payload["gold"]["result"]["case_count"]
+    print(
+        f"PASS: reported provisional={provisional_count} and "
+        f"human-approved={gold_count} case(s)"
+    )
+    print(f"JSON: {arguments.json_output}")
+    print(f"HTML: {arguments.html_output}")
+    return 0
+
+
+if __name__ == "__main__":
+    raise SystemExit(main())
