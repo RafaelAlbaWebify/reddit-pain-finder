@@ -118,14 +118,26 @@ def test_compare_reviews_extracts_disagreement_queue(tmp_path: Path) -> None:
     _write_worksheet(
         left,
         [
-            _review_row("a", reviewer="reviewer-a", pain="true", categories="manual_work", cluster="x"),
+            _review_row(
+                "a",
+                reviewer="reviewer-a",
+                pain="true",
+                categories="manual_work",
+                cluster="x",
+            ),
             _review_row("b", reviewer="reviewer-a", pain="false", categories="", cluster=""),
         ],
     )
     _write_worksheet(
         right,
         [
-            _review_row("a", reviewer="reviewer-b", pain="true", categories="reliability", cluster="x"),
+            _review_row(
+                "a",
+                reviewer="reviewer-b",
+                pain="true",
+                categories="reliability",
+                cluster="x",
+            ),
             _review_row("b", reviewer="reviewer-b", pain="false", categories="", cluster=""),
         ],
     )
@@ -158,8 +170,20 @@ def test_compare_reviews_extracts_disagreement_queue(tmp_path: Path) -> None:
 def test_compare_reviews_rejects_changed_evidence(tmp_path: Path) -> None:
     left = tmp_path / "left.csv"
     right = tmp_path / "right.csv"
-    left_row = _review_row("a", reviewer="reviewer-a", pain="true", categories="manual_work", cluster="x")
-    right_row = _review_row("a", reviewer="reviewer-b", pain="true", categories="manual_work", cluster="x")
+    left_row = _review_row(
+        "a",
+        reviewer="reviewer-a",
+        pain="true",
+        categories="manual_work",
+        cluster="x",
+    )
+    right_row = _review_row(
+        "a",
+        reviewer="reviewer-b",
+        pain="true",
+        categories="manual_work",
+        cluster="x",
+    )
     right_row["body"] = "Changed source evidence"
     _write_worksheet(left, [left_row])
     _write_worksheet(right, [right_row])
