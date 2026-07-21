@@ -136,10 +136,11 @@ def _load_blind_packet(path: Path) -> dict[str, dict[str, str]]:
         rows = list(reader)
     result: dict[str, dict[str, str]] = {}
     for row in rows:
-        external_id = row["external_id"].strip()
+        normalized = {column: row.get(column) or "" for column in REVIEW_COLUMNS}
+        external_id = normalized["external_id"].strip()
         if not external_id or external_id in result:
             raise ProvisionalReviewError("Blind packet IDs must be non-empty and unique")
-        result[external_id] = row
+        result[external_id] = normalized
     if not result:
         raise ProvisionalReviewError("Blind packet is empty")
     return result
