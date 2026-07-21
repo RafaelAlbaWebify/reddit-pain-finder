@@ -79,21 +79,24 @@ def _load_approved_rows(path: Path) -> tuple[list[dict[str, str]], int]:
         external_id = (row.get("external_id") or "").strip()
         if not external_id or external_id in seen_ids:
             raise HumanApprovalError(
-                f"Invalid approval queue line {line_number}: IDs must be non-empty and unique"
+                f"Invalid approval queue line {line_number}: "
+                "IDs must be non-empty and unique"
             )
         seen_ids.add(external_id)
 
         decision = (row.get("human_decision") or "").strip().lower()
         if decision not in {"approve", "exclude"}:
             raise HumanApprovalError(
-                f"Invalid approval queue line {line_number}: human_decision must be approve or exclude"
+                f"Invalid approval queue line {line_number}: "
+                "human_decision must be approve or exclude"
             )
         reviewer = (row.get("human_reviewer") or "").strip()
         reviewed_at = (row.get("human_reviewed_at") or "").strip()
         rationale = (row.get("human_rationale") or "").strip()
         if not reviewer or not reviewed_at or not rationale:
             raise HumanApprovalError(
-                f"Invalid approval queue line {line_number}: human reviewer, timestamp and rationale are required"
+                f"Invalid approval queue line {line_number}: "
+                "human reviewer, timestamp and rationale are required"
             )
 
         if decision == "exclude":
