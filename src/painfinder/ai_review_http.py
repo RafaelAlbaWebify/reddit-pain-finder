@@ -73,13 +73,11 @@ def run_http_ai_reviews(
             temporary = output.with_suffix(output.suffix + ".tmp")
             temporary.unlink(missing_ok=True)
             decisions = [
-                _review_item(profile, evidence[external_id])
-                for external_id in sorted(evidence)
+                _review_item(profile, evidence[external_id]) for external_id in sorted(evidence)
             ]
             temporary.write_text(
                 "".join(
-                    json.dumps(decision.model_dump(mode="json"), separators=(",", ":"))
-                    + "\n"
+                    json.dumps(decision.model_dump(mode="json"), separators=(",", ":")) + "\n"
                     for decision in decisions
                 ),
                 encoding="utf-8",
@@ -189,9 +187,7 @@ def _post_json(
                 body = response.read().decode("utf-8")
             parsed = json.loads(body)
             if not isinstance(parsed, dict):
-                raise AIReviewRunnerError(
-                    f"Reviewer {profile.name} returned a non-object response"
-                )
+                raise AIReviewRunnerError(f"Reviewer {profile.name} returned a non-object response")
             return parsed
         except (urllib.error.URLError, TimeoutError, json.JSONDecodeError) as error:
             if attempt >= attempts:
