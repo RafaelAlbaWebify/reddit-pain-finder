@@ -8,10 +8,11 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
 
-from pydantic import BaseModel, Field, field_validator
+from pydantic import BaseModel, Field, ValidationError, field_validator
 
+from painfinder.analysis import detect_pain_signals
 from painfinder.benchmark_review import REVIEW_COLUMNS
-from painfinder.domain import PainCategory
+from painfinder.domain import PainCategory, SourceItem
 
 
 class ProvisionalReviewError(RuntimeError):
@@ -45,6 +46,7 @@ class ConsensusSummary:
     disputed_count: int
     low_confidence_count: int
     audit_sample_count: int
+    detector_conflict_count: int
 
 
 def build_provisional_review(
@@ -63,6 +65,7 @@ def build_provisional_review(
         raise ProvisionalReviewError("audit_percent must be between 0 and 100")
 
     evidence = _load_blind_packet(blind_packet)
+    detector_predictions = _detector_predictions(evidence)
     reviews = [_load_reviewer_output(path) for path in reviewer_outputs]
     expected_ids = set(evidence)
     for index, reviewer in enumerate(reviews, start=1):
@@ -80,6 +83,7 @@ def build_provisional_review(
     disputed_count = 0
     low_confidence_count = 0
     audit_sample_count = 0
+    detector_conflict_count = 0
 
     for external_id in sorted(evidence):
         decisions = [reviewer[external_id] for reviewer in reviews]
@@ -87,6 +91,11 @@ def build_provisional_review(
         mean_confidence = sum(decision.confidence for decision in decisions) / len(decisions)
         low_confidence = mean_confidence < minimum_confidence
         audit_sample = _in_audit_sample(external_id, audit_percent)
+        detector_pain, detector_categories = detector_predictions[external_id]
+        detector_conflict = (
+            consensus.expected_pain != detector_pain
+            or set(consensus.expected_categories) != detector_categories
+        )
         reasons: list[str] = []
 
         if agreement == "unanimous":
@@ -103,9 +112,21 @@ def build_provisional_review(
         if audit_sample:
             audit_sample_count += 1
             reasons.append("audit_sample")
+        if detector_conflict:
+            detector_conflict_count += 1
+            reasons.append("detector_conflict")
 
         source = evidence[external_id]
-        row = _output_row(source, consensus, decisions, agreement, mean_confidence, reasons)
+        row = _output_row(
+            source,
+            consensus,
+            decisions,
+            agreement,
+            mean_confidence,
+            reasons,
+            detector_pain,
+            detector_categories,
+        )
         if reasons:
             queue_rows.append(row)
         else:
@@ -122,6 +143,7 @@ def build_provisional_review(
         disputed_count=disputed_count,
         low_confidence_count=low_confidence_count,
         audit_sample_count=audit_sample_count,
+        detector_conflict_count=detector_conflict_count,
     )
     summary_output.parent.mkdir(parents=True, exist_ok=True)
     summary_output.write_text(json.dumps(summary.__dict__, indent=2), encoding="utf-8")
@@ -144,6 +166,37 @@ def _load_blind_packet(path: Path) -> dict[str, dict[str, str]]:
     if not result:
         raise ProvisionalReviewError("Blind packet is empty")
     return result
+
+
+def _detector_predictions(
+    evidence: dict[str, dict[str, str]],
+) -> dict[str, tuple[bool, set[PainCategory]]]:
+    items: list[SourceItem] = []
+    try:
+        for external_id in sorted(evidence):
+            row = evidence[external_id]
+            items.append(
+                SourceItem.model_validate(
+                    {
+                        "external_id": external_id,
+                        "source_type": row["source_type"],
+                        "title": row["title"],
+                        "body": row["body"],
+                        "subreddit": row["community"] or None,
+                        "canonical_url": row["canonical_url"],
+                    }
+                )
+            )
+    except ValidationError as error:
+        raise ProvisionalReviewError(f"Blind packet contains invalid evidence: {error}") from error
+
+    categories_by_id: dict[str, set[PainCategory]] = {item.external_id: set() for item in items}
+    for signal in detect_pain_signals(items):
+        categories_by_id[signal.source_external_id].add(signal.category)
+    return {
+        external_id: (bool(categories), categories)
+        for external_id, categories in categories_by_id.items()
+    }
 
 
 def _load_reviewer_output(path: Path) -> dict[str, ReviewerDecision]:
@@ -202,6 +255,8 @@ def _output_row(
     agreement: str,
     mean_confidence: float,
     reasons: list[str],
+    detector_pain: bool,
+    detector_categories: set[PainCategory],
 ) -> dict[str, str]:
     return {
         **{column: source[column] for column in REVIEW_COLUMNS[:6]},
@@ -221,6 +276,14 @@ def _output_row(
             [decision.model_dump(mode="json") for decision in decisions],
             separators=(",", ":"),
         ),
+        "detector_pain": str(detector_pain).lower(),
+        "detector_categories": ",".join(
+            category.value
+            for category in sorted(
+                detector_categories,
+                key=lambda value: value.value,
+            )
+        ),
         "human_decision": "",
         "human_reviewer": "",
         "human_reviewed_at": "",
@@ -235,6 +298,8 @@ def _write_rows(path: Path, rows: list[dict[str, str]]) -> None:
         "mean_confidence",
         "escalation_reasons",
         "reviewer_decisions",
+        "detector_pain",
+        "detector_categories",
         "human_decision",
         "human_reviewer",
         "human_reviewed_at",

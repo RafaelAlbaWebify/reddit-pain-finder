@@ -19,8 +19,8 @@ def _packet(path: Path, ids: list[str]) -> None:
                 {
                     "external_id": external_id,
                     "source_type": "post",
-                    "title": f"Title {external_id}",
-                    "body": f"Body {external_id}",
+                    "title": f"Invoice workflow {external_id}",
+                    "body": "We manually update this spreadsheet every week.",
                     "community": "smallbusiness",
                     "canonical_url": f"https://example.com/{external_id}",
                     "expected_pain": "",

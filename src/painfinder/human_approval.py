@@ -17,6 +17,8 @@ APPROVAL_COLUMNS = (
     "mean_confidence",
     "escalation_reasons",
     "reviewer_decisions",
+    "detector_pain",
+    "detector_categories",
     "human_decision",
     "human_reviewer",
     "human_reviewed_at",
