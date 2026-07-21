@@ -128,11 +128,7 @@ def _parse_bool(value: str, line_number: int) -> bool:
 def _parse_categories(value: str, line_number: int) -> tuple[PainCategory, ...]:
     if not value:
         return ()
-    raw_categories = [
-        part.strip()
-        for part in value.replace(";", ",").split(",")
-        if part.strip()
-    ]
+    raw_categories = [part.strip() for part in value.replace(";", ",").split(",") if part.strip()]
     categories: list[PainCategory] = []
     for raw_category in raw_categories:
         try:

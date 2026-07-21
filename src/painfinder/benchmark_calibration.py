@@ -53,32 +53,16 @@ def audit_corpus(path: Path) -> CorpusAudit:
         raise CalibrationError(str(error)) from error
 
     ids = [case.item.external_id for case in cases]
-    duplicate_ids = tuple(
-        sorted(item_id for item_id, count in Counter(ids).items() if count > 1)
-    )
-    communities = tuple(
-        sorted({case.item.subreddit for case in cases if case.item.subreddit})
-    )
+    duplicate_ids = tuple(sorted(item_id for item_id, count in Counter(ids).items() if count > 1))
+    communities = tuple(sorted({case.item.subreddit for case in cases if case.item.subreddit}))
     categories = tuple(
-        sorted(
-            {
-                category.value
-                for case in cases
-                for category in case.expected_categories
-            }
-        )
+        sorted({category.value for case in cases for category in case.expected_categories})
     )
     cluster_counts = Counter(
-        case.expected_cluster
-        for case in cases
-        if case.expected_cluster is not None
+        case.expected_cluster for case in cases if case.expected_cluster is not None
     )
     multi_item_clusters = tuple(
-        sorted(
-            cluster
-            for cluster, count in cluster_counts.items()
-            if count >= 2
-        )
+        sorted(cluster for cluster, count in cluster_counts.items() if count >= 2)
     )
     positive_count = sum(case.expected_pain for case in cases)
     negative_count = len(cases) - positive_count
@@ -143,16 +127,11 @@ def compare_review_worksheets(
     for external_id in sorted(left_rows):
         left_row = left_rows[external_id]
         right_row = right_rows[external_id]
-        if any(
-            left_row[column] != right_row[column]
-            for column in EVIDENCE_COLUMNS
-        ):
+        if any(left_row[column] != right_row[column] for column in EVIDENCE_COLUMNS):
             evidence_mismatches.append(external_id)
             continue
         differing_labels = [
-            column
-            for column in LABEL_COLUMNS
-            if left_row[column] != right_row[column]
+            column for column in LABEL_COLUMNS if left_row[column] != right_row[column]
         ]
         if differing_labels:
             disagreements.append(
@@ -168,8 +147,7 @@ def compare_review_worksheets(
 
     if evidence_mismatches:
         raise CalibrationError(
-            "Reviewer worksheets changed source evidence for IDs: "
-            + ", ".join(evidence_mismatches)
+            "Reviewer worksheets changed source evidence for IDs: " + ", ".join(evidence_mismatches)
         )
 
     _write_disagreements(disagreements_output, disagreements)
@@ -178,11 +156,7 @@ def compare_review_worksheets(
         "item_count": item_count,
         "agreement_count": agreement_count,
         "disagreement_count": len(disagreements),
-        "agreement_rate": (
-            round(agreement_count / item_count, 4)
-            if item_count
-            else 0.0
-        ),
+        "agreement_rate": (round(agreement_count / item_count, 4) if item_count else 0.0),
         "disagreement_ids": [row["external_id"] for row in disagreements],
     }
     summary_output.parent.mkdir(parents=True, exist_ok=True)
@@ -220,17 +194,13 @@ def compare_benchmark_results(
         "overmerge_pairs",
     )
     error_count_deltas = {
-        name: len(_list(after_payload, name))
-        - len(_list(before_payload, name))
+        name: len(_list(after_payload, name)) - len(_list(before_payload, name))
         for name in error_fields
     }
     comparison: dict[str, object] = {
         "before_case_count": int(before_payload["case_count"]),
         "after_case_count": int(after_payload["case_count"]),
-        "same_case_count": (
-            before_payload["case_count"]
-            == after_payload["case_count"]
-        ),
+        "same_case_count": (before_payload["case_count"] == after_payload["case_count"]),
         "metric_deltas": metric_deltas,
         "error_count_deltas": error_count_deltas,
         "before_metrics": before_metrics,
@@ -299,24 +269,16 @@ def _read_worksheet(path: Path) -> dict[str, dict[str, str]]:
         reader = csv.DictReader(handle)
         if tuple(reader.fieldnames or ()) != REVIEW_COLUMNS:
             raise CalibrationError(
-                "Invalid worksheet headers; expected: "
-                + ", ".join(REVIEW_COLUMNS)
+                "Invalid worksheet headers; expected: " + ", ".join(REVIEW_COLUMNS)
             )
         rows: dict[str, dict[str, str]] = {}
         for line_number, raw_row in enumerate(reader, start=2):
-            row = {
-                column: (raw_row.get(column) or "").strip()
-                for column in REVIEW_COLUMNS
-            }
+            row = {column: (raw_row.get(column) or "").strip() for column in REVIEW_COLUMNS}
             external_id = row["external_id"]
             if not external_id:
-                raise CalibrationError(
-                    f"Blank external_id on line {line_number}"
-                )
+                raise CalibrationError(f"Blank external_id on line {line_number}")
             if external_id in rows:
-                raise CalibrationError(
-                    f"Duplicate external_id in worksheet: {external_id}"
-                )
+                raise CalibrationError(f"Duplicate external_id in worksheet: {external_id}")
             rows[external_id] = row
     return rows
 
@@ -325,9 +287,7 @@ def _read_result(path: Path) -> dict[str, Any]:
     try:
         payload = json.loads(path.read_text(encoding="utf-8"))
     except (OSError, json.JSONDecodeError) as error:
-        raise CalibrationError(
-            f"Could not read benchmark result: {error}"
-        ) from error
+        raise CalibrationError(f"Could not read benchmark result: {error}") from error
     if not isinstance(payload, dict):
         raise CalibrationError("Benchmark result must be a JSON object")
     return payload
@@ -336,16 +296,12 @@ def _read_result(path: Path) -> dict[str, Any]:
 def _mapping(payload: dict[str, Any], key: str) -> dict[str, Any]:
     value = payload.get(key)
     if not isinstance(value, dict):
-        raise CalibrationError(
-            f"Benchmark result field {key} must be an object"
-        )
+        raise CalibrationError(f"Benchmark result field {key} must be an object")
     return value
 
 
 def _list(payload: dict[str, Any], key: str) -> list[Any]:
     value = payload.get(key)
     if not isinstance(value, list):
-        raise CalibrationError(
-            f"Benchmark result field {key} must be a list"
-        )
+        raise CalibrationError(f"Benchmark result field {key} must be a list")
     return value
