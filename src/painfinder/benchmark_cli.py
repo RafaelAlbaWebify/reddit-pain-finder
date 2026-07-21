@@ -23,6 +23,7 @@ from painfinder.benchmark_review_import import (
     ReviewWorksheetError,
     import_review_worksheet,
 )
+from painfinder.benchmark_sampling import SamplingError, prepare_blind_review_packets
 from painfinder.storage import SQLiteResearchRepository
 
 benchmark_app = typer.Typer(no_args_is_help=True)
@@ -73,6 +74,43 @@ def prepare_review(
 
     typer.echo(f"PASS: prepared {item_count} evidence item(s) for independent review")
     typer.echo(f"Worksheet: {output}")
+
+
+@benchmark_app.command("prepare-blind-review")
+def prepare_blind_review(
+    run_id: Annotated[str, typer.Option()],
+    sample_size: Annotated[int, typer.Option(min=1)] = 100,
+    database: Annotated[Path, typer.Option(exists=True, readable=True)] = Path("data/research.db"),
+    reviewer_a_output: Annotated[Path, typer.Option()] = Path("output/reviewer-a.csv"),
+    reviewer_b_output: Annotated[Path, typer.Option()] = Path("output/reviewer-b.csv"),
+    manifest_output: Annotated[Path, typer.Option()] = Path("output/review-sampling.json"),
+    near_duplicate_threshold: Annotated[float, typer.Option(min=0.5, max=1.0)] = 0.9,
+) -> None:
+    """Create balanced, deduplicated and identical blind reviewer packets."""
+    repository = SQLiteResearchRepository(database)
+    repository.initialize()
+    try:
+        result = prepare_blind_review_packets(
+            repository,
+            run_id,
+            sample_size=sample_size,
+            reviewer_a_output=reviewer_a_output,
+            reviewer_b_output=reviewer_b_output,
+            manifest_output=manifest_output,
+            near_duplicate_threshold=near_duplicate_threshold,
+        )
+    except SamplingError as error:
+        typer.echo(f"ERROR: {error}")
+        raise typer.Exit(code=2) from error
+
+    typer.echo(
+        f"PASS: selected {result.selected_count} of {result.available_count} item(s); "
+        f"communities={len(result.communities)}, source_types={len(result.source_types)}, "
+        f"near_duplicates_excluded={result.excluded_near_duplicates}"
+    )
+    typer.echo(f"Reviewer A: {reviewer_a_output}")
+    typer.echo(f"Reviewer B: {reviewer_b_output}")
+    typer.echo(f"Manifest: {manifest_output}")
 
 
 @benchmark_app.command("import-review")
