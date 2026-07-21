@@ -114,6 +114,7 @@ def _load_candidates(
 
     multi_run = len(runs) > 1
     candidates: list[SamplingCandidate] = []
+    packet_id_owners: dict[str, tuple[str, str]] = {}
     for run in runs:
         for item in repository.list_source_items(run.run_id):
             packet_id = (
@@ -121,6 +122,15 @@ def _load_candidates(
                 if multi_run
                 else item.external_id
             )
+            identity = (run.run_id, item.external_id)
+            previous_identity = packet_id_owners.get(packet_id)
+            if previous_identity is not None and previous_identity != identity:
+                raise SamplingError(
+                    "Composite packet ID collision for "
+                    f"{previous_identity[0]}/{previous_identity[1]} and "
+                    f"{identity[0]}/{identity[1]}"
+                )
+            packet_id_owners[packet_id] = identity
             candidates.append(
                 SamplingCandidate(
                     run_id=run.run_id,
