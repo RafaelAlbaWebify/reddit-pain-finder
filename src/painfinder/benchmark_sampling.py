@@ -3,7 +3,7 @@ from __future__ import annotations
 import csv
 import json
 import re
-from collections import Counter, defaultdict, deque
+from collections import defaultdict, deque
 from dataclasses import dataclass
 from pathlib import Path
 
@@ -154,13 +154,6 @@ def _write_manifest(
     threshold: float,
     result: SamplingResult,
 ) -> None:
-    community_counts = Counter()
-    source_type_counts = Counter()
-    for community in result.communities:
-        community_counts[community] += 1
-    for source_type in result.source_types:
-        source_type_counts[source_type] += 1
-
     payload = {
         "run_id": run_id,
         "requested_sample_size": requested_size,
