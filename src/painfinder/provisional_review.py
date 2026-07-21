@@ -93,6 +93,7 @@ def build_provisional_review(
             unanimous_count += 1
         elif agreement == "majority":
             majority_count += 1
+            reasons.append("reviewer_disagreement")
         else:
             disputed_count += 1
             reasons.append("disputed")
@@ -146,7 +147,8 @@ def _load_blind_packet(path: Path) -> dict[str, dict[str, str]]:
 
 def _load_reviewer_output(path: Path) -> dict[str, ReviewerDecision]:
     result: dict[str, ReviewerDecision] = {}
-    for line_number, raw_line in enumerate(path.read_text(encoding="utf-8").splitlines(), start=1):
+    lines = path.read_text(encoding="utf-8").splitlines()
+    for line_number, raw_line in enumerate(lines, start=1):
         if not raw_line.strip():
             continue
         try:
