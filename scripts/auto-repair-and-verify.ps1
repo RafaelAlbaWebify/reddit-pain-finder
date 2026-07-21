@@ -85,6 +85,20 @@ if ($ChangedFiles.Count -gt 0) {
         throw "Ruff still fails after safe repair. All changes were discarded."
     }
 
+    $LocalVerification = Join-Path $ProjectPath "scripts\verify-mvp.ps1"
+    try {
+        if ($IncludeHackerNewsSmoke) {
+            & $LocalVerification -IncludeHackerNewsSmoke
+        }
+        else {
+            & $LocalVerification
+        }
+    }
+    catch {
+        & git reset --hard $Before | Out-Null
+        throw "Complete verification failed after mechanical repair. All changes were discarded. $($_.Exception.Message)"
+    }
+
     & git add -- $ChangedFiles
     if ($LASTEXITCODE -ne 0) {
         & git reset --hard $Before | Out-Null
@@ -97,7 +111,7 @@ if ($ChangedFiles.Count -gt 0) {
     }
     & git push origin $Branch
     if ($LASTEXITCODE -ne 0) {
-        throw "Mechanical repair commit was created locally but could not be pushed."
+        throw "Mechanical repair commit passed verification and was committed locally, but push failed."
     }
 }
 else {
@@ -111,8 +125,8 @@ if ($IncludeHackerNewsSmoke) {
 else {
     & $VerificationScript
 }
-if ($LASTEXITCODE -ne 0) {
-    throw "Authoritative verification failed after repair."
+if (-not $?) {
+    throw "Authoritative verification failed after synchronization."
 }
 
 $Final = (& git rev-parse HEAD).Trim()
