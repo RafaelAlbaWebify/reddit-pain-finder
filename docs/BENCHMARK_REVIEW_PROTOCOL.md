@@ -20,8 +20,8 @@ Record:
 - `expected_pain`: whether the text contains an actionable workflow pain;
 - `expected_categories`: all supported categories clearly evidenced by the text;
 - `expected_cluster`: a concise topic identifier shared only by items describing the same underlying workflow problem;
-- `reviewer_notes`: a short rationale kept in the worksheet, not in the benchmark JSONL;
-- `review_status`: `pending`, `reviewed`, or `disputed`.
+- `rationale`: a short explanation kept in the worksheet, not in benchmark JSONL;
+- `review_status`: `unreviewed` while incomplete and `resolved` only after the reviewer has finished the row.
 
 Do not label a case as pain solely because the product could theoretically help it. Label only what the source text supports.
 
@@ -48,50 +48,17 @@ Cluster IDs are reviewed topic identities, not detector keys.
 
 Human reviewers remain responsible only for semantic labels and dispute resolution. The project automates the surrounding evidence controls.
 
-1. Export the same unlabeled worksheet for two independent reviewers.
-2. Reviewers label copies without detector output.
-3. Compare the worksheets:
+1. Use `benchmark prepare-review` to export a blind worksheet from a stored run.
+2. Make two independent copies and assign stable reviewer labels.
+3. Complete labels without running or inspecting detector output.
+4. Use `benchmark compare-reviews` to verify that source evidence stayed unchanged and produce the disagreement queue.
+5. Human reviewers adjudicate only disputed rows and create one resolved worksheet.
+6. Use `benchmark import-review` to validate the resolved worksheet and create JSONL.
+7. Use `benchmark audit-corpus` to enforce the minimum structural prerequisites.
+8. Run the benchmark and preserve JSON and HTML outputs.
+9. For every detector or clustering change, run the same corpus before and after and use `benchmark compare-results` to preserve neutral deltas.
 
-```powershell
-.\.venv\Scripts\python.exe -m painfinder benchmark compare-reviews `
-  --left output\reviewer-a.csv `
-  --right output\reviewer-b.csv `
-  --disagreements-output output\review-disagreements.csv `
-  --json-output output\review-agreement.json
-```
-
-The command rejects changed source evidence or mismatched evidence IDs, records agreement rate, and produces a dispute queue. It does not resolve labels.
-
-4. Resolve disputes in a separate worksheet and import the resolved corpus.
-5. Audit corpus prerequisites before using metrics for calibration:
-
-```powershell
-.\.venv\Scripts\python.exe -m painfinder benchmark audit-corpus `
-  --corpus output\reviewed-benchmark-corpus.jsonl `
-  --json-output output\benchmark-corpus-audit.json
-```
-
-6. Run and preserve the baseline benchmark.
-7. After any detector or clustering change, rerun the same corpus and compare results:
-
-```powershell
-.\.venv\Scripts\python.exe -m painfinder benchmark compare-results `
-  --before output\benchmark-before.json `
-  --after output\benchmark-after.json `
-  --output output\benchmark-comparison.json
-```
-
-The comparison records exact metric and error-count deltas without declaring a change successful automatically.
-
-## Review workflow
-
-1. Copy `examples/benchmark-review-worksheet.csv` to a dated working file.
-2. Add evidence rows with source text and canonical URLs.
-3. Complete labels without running the detector.
-4. Resolve all `disputed` rows or exclude them from the benchmark.
-5. Convert reviewed rows to the JSONL corpus format documented in `docs/BENCHMARKING.md`.
-6. Run the benchmark and preserve JSON and HTML outputs.
-7. Record before/after outputs for every detector, category or clustering-rule change.
+The tools automate validation, comparison and evidence production. They do not create labels, resolve disagreements or choose detector changes.
 
 ## Minimum corpus quality before calibration
 
@@ -102,9 +69,12 @@ Before using metrics to tune rules, the reviewed corpus should contain:
 - positive and negative examples;
 - more than one reviewed cluster with at least two items;
 - examples expected to expose false positives, false negatives, fragmentation and over-merging;
-- no unresolved or disputed labels.
+- no unresolved labels;
+- unique external IDs and unchanged source evidence across reviewers.
 
-There is intentionally no target precision or recall threshold yet. Thresholds must be chosen from representative evidence and product risk, not from the small behavior-proving fixture.
+`benchmark audit-corpus` enforces the objective structural subset of these requirements. Human reviewers must still judge whether the evidence is genuinely diverse and representative enough for the intended product decisions.
+
+There is intentionally no target precision or recall threshold yet. Thresholds must be chosen from representative evidence and product risk, not from the small behavior-proving fixtures.
 
 ## Audit expectations
 
@@ -114,5 +84,8 @@ For each corpus revision, record:
 - reviewer identity or stable reviewer label;
 - evidence source and collection method;
 - number of included, excluded and disputed rows;
+- agreement summary and disagreement IDs;
+- corpus audit JSON;
 - benchmark results before and after any rule change;
-- explanation for label or cluster changes.
+- machine-readable result comparison;
+- explanation for label, cluster or detector-rule changes.
