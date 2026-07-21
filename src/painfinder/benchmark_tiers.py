@@ -5,10 +5,16 @@ import csv
 import json
 from dataclasses import asdict
 from pathlib import Path
+from typing import Any
 
 from pydantic import ValidationError
 
-from painfinder.benchmark import BenchmarkCase, evaluate_benchmark, load_benchmark
+from painfinder.benchmark import (
+    BenchmarkCase,
+    BenchmarkFormatError,
+    evaluate_benchmark,
+    load_benchmark,
+)
 from painfinder.benchmark_review import REVIEW_COLUMNS
 from painfinder.domain import PainCategory, SourceItem
 
@@ -23,12 +29,12 @@ def write_tiered_benchmark_report(
     *,
     json_output: Path,
     html_output: Path,
-) -> dict[str, object]:
+) -> dict[str, Any]:
     provisional_cases = _load_provisional_cases(provisional_csv)
     gold_cases = load_benchmark(gold_corpus)
     provisional_result = evaluate_benchmark(provisional_cases)
     gold_result = evaluate_benchmark(gold_cases)
-    payload = {
+    payload: dict[str, Any] = {
         "provisional": {
             "provenance": "ai_unanimous_not_human_approved",
             "result": asdict(provisional_result),
@@ -100,7 +106,7 @@ def _parse_bool(value: str) -> bool:
     raise ValueError("expected_pain must be true or false")
 
 
-def _html(payload: dict[str, object]) -> str:
+def _html(payload: dict[str, Any]) -> str:
     provisional = payload["provisional"]
     gold = payload["gold"]
     return f"""<!doctype html>
@@ -136,7 +142,7 @@ def main() -> int:
             json_output=arguments.json_output,
             html_output=arguments.html_output,
         )
-    except (TieredBenchmarkError, OSError, ValueError) as error:
+    except (TieredBenchmarkError, BenchmarkFormatError, OSError, ValueError) as error:
         print(f"ERROR: {error}")
         return 2
     provisional_count = payload["provisional"]["result"]["case_count"]
