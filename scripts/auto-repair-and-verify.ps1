@@ -36,6 +36,10 @@ if ($LASTEXITCODE -ne 0) {
 if ($LASTEXITCODE -ne 0) {
     throw "Remote branch origin/$Branch does not exist."
 }
+& git show-ref --verify --quiet "refs/remotes/origin/main"
+if ($LASTEXITCODE -ne 0) {
+    throw "Remote base branch origin/main does not exist."
+}
 
 $Ahead = [int]((& git rev-list --count "origin/$Branch..$Branch").Trim())
 $Behind = [int]((& git rev-list --count "$Branch..origin/$Branch").Trim())
@@ -50,16 +54,38 @@ if ($Behind -gt 0) {
 }
 
 $Before = (& git rev-parse HEAD).Trim()
+$MergeBase = (& git merge-base origin/main HEAD).Trim()
+if ($LASTEXITCODE -ne 0 -or -not $MergeBase) {
+    throw "Could not determine the merge base with origin/main."
+}
+
+$RepairTargets = @(
+    & git diff --name-only "$MergeBase..HEAD" -- "*.py" |
+        Where-Object { $_ -and (Test-Path $_) }
+)
+if ($LASTEXITCODE -ne 0) {
+    throw "Could not determine branch-changed Python files."
+}
+
 Write-Host "Repair branch: $Branch" -ForegroundColor Green
 Write-Host "Starting commit: $Before" -ForegroundColor Green
 
-& $Python -m ruff format .
-if ($LASTEXITCODE -ne 0) {
-    throw "Ruff formatter failed."
+if ($RepairTargets.Count -gt 0) {
+    Write-Host "Mechanical repair scope:" -ForegroundColor Cyan
+    $RepairTargets | ForEach-Object { Write-Host $_ }
+
+    & $Python -m ruff format @RepairTargets
+    if ($LASTEXITCODE -ne 0) {
+        throw "Ruff formatter failed."
+    }
+    & $Python -m ruff check @RepairTargets --fix
+    if ($LASTEXITCODE -ne 0) {
+        & git reset --hard $Before | Out-Null
+        throw "Ruff safe-fix pass failed. All changes were discarded."
+    }
 }
-& $Python -m ruff check . --fix
-if ($LASTEXITCODE -ne 0) {
-    throw "Ruff safe-fix pass failed."
+else {
+    Write-Host "No branch-changed Python files require mechanical repair." -ForegroundColor Green
 }
 
 $ChangedFiles = @(& git diff --name-only)
@@ -68,12 +94,12 @@ if ($LASTEXITCODE -ne 0) {
 }
 
 if ($ChangedFiles.Count -gt 0) {
-    $UnsafeFiles = @($ChangedFiles | Where-Object { $_ -notmatch '\.py$' })
-    if ($UnsafeFiles.Count -gt 0) {
+    $OutOfScope = @($ChangedFiles | Where-Object { $_ -notin $RepairTargets })
+    if ($OutOfScope.Count -gt 0) {
         Write-Host "Unexpected files changed by repair:" -ForegroundColor Yellow
-        $UnsafeFiles | ForEach-Object { Write-Host $_ }
+        $OutOfScope | ForEach-Object { Write-Host $_ }
         & git reset --hard $Before | Out-Null
-        throw "Automatic repair may only modify Python files. All changes were discarded."
+        throw "Automatic repair changed files outside the branch Python scope. All changes were discarded."
     }
 
     Write-Host "Mechanical repairs applied:" -ForegroundColor Cyan
