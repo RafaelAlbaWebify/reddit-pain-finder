@@ -24,6 +24,7 @@ from painfinder.benchmark_review_import import (
     import_review_worksheet,
 )
 from painfinder.benchmark_sampling import SamplingError, prepare_blind_review_packets
+from painfinder.provisional_review import ProvisionalReviewError, build_provisional_review
 from painfinder.storage import SQLiteResearchRepository
 
 benchmark_app = typer.Typer(no_args_is_help=True)
@@ -115,6 +116,57 @@ def prepare_blind_review(
     typer.echo(f"Reviewer A: {reviewer_a_output}")
     typer.echo(f"Reviewer B: {reviewer_b_output}")
     typer.echo(f"Manifest: {manifest_output}")
+
+
+@benchmark_app.command("build-provisional-review")
+def build_provisional_review_command(
+    blind_packet: Annotated[Path, typer.Option(exists=True, readable=True)],
+    reviewer_output: Annotated[
+        list[Path],
+        typer.Option(
+            exists=True,
+            readable=True,
+            help="Reviewer JSONL. Supply exactly three --reviewer-output values.",
+        ),
+    ],
+    provisional_output: Annotated[Path, typer.Option()] = Path(
+        "output/provisional-review.csv"
+    ),
+    approval_queue_output: Annotated[Path, typer.Option()] = Path(
+        "output/human-approval-queue.csv"
+    ),
+    summary_output: Annotated[Path, typer.Option()] = Path(
+        "output/provisional-review-summary.json"
+    ),
+    minimum_confidence: Annotated[float, typer.Option(min=0.0, max=1.0)] = 0.8,
+    audit_percent: Annotated[int, typer.Option(min=0, max=100)] = 10,
+) -> None:
+    """Combine three isolated AI reviews and create a human approval queue."""
+    if len(reviewer_output) != 3:
+        typer.echo("ERROR: exactly three --reviewer-output values are required")
+        raise typer.Exit(code=2)
+    try:
+        summary = build_provisional_review(
+            blind_packet,
+            (reviewer_output[0], reviewer_output[1], reviewer_output[2]),
+            provisional_output=provisional_output,
+            approval_queue_output=approval_queue_output,
+            summary_output=summary_output,
+            minimum_confidence=minimum_confidence,
+            audit_percent=audit_percent,
+        )
+    except ProvisionalReviewError as error:
+        typer.echo(f"ERROR: {error}")
+        raise typer.Exit(code=2) from error
+
+    typer.echo(
+        f"PASS: reviewed {summary.item_count} item(s); "
+        f"provisional={summary.provisional_count}, "
+        f"approval_queue={summary.approval_queue_count}"
+    )
+    typer.echo(f"Provisional: {provisional_output}")
+    typer.echo(f"Approval queue: {approval_queue_output}")
+    typer.echo(f"Summary: {summary_output}")
 
 
 @benchmark_app.command("import-review")
