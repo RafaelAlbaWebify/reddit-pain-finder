@@ -32,41 +32,62 @@ The static [`../examples/benchmark-review-worksheet.csv`](../examples/benchmark-
 
 ## Import a resolved worksheet
 
-After independent review and disagreement resolution, validate the entire worksheet and convert it to benchmark JSONL:
+After independent review and disagreement resolution, convert the completed worksheet into benchmark JSONL:
 
 ```powershell
 .\.venv\Scripts\python.exe -m painfinder benchmark import-review `
-  --worksheet output\benchmark-review-resolved.csv `
+  --worksheet output\benchmark-review-worksheet.csv `
   --output output\reviewed-benchmark-corpus.jsonl
 ```
 
-The importer requires every row to be resolved and audit-complete. Positive cases require categories and a cluster; negative cases must not define either. It never creates labels or tunes detector rules.
+The importer validates the complete worksheet before writing output. Every row must be marked `resolved` and include an explicit pain label, reviewer, timezone-aware review timestamp and rationale. Positive pain cases require at least one valid category and a cluster identifier. Negative cases must not define categories or a cluster. Duplicate evidence IDs, malformed source records and inconsistent labels are rejected.
 
-## Audit corpus prerequisites
+The importer never creates labels or tunes detector rules.
 
-Check whether a reviewed corpus meets the protocol's minimum objective conditions before using it for calibration:
+## Automated calibration controls
+
+The project automates all objective evidence controls around human review:
 
 ```powershell
 .\.venv\Scripts\python.exe -m painfinder benchmark audit-corpus `
   --corpus output\reviewed-benchmark-corpus.jsonl `
   --json-output output\benchmark-corpus-audit.json
-```
 
-The command fails when IDs are duplicated or the corpus lacks multiple communities, categories, positive and negative examples, or at least two multi-item reviewed clusters. Passing this gate proves only the documented structural prerequisites; it does not by itself establish representativeness.
-
-## Compare independent reviews
-
-Compare two reviewers' worksheets without resolving their labels automatically:
-
-```powershell
 .\.venv\Scripts\python.exe -m painfinder benchmark compare-reviews `
   --left output\reviewer-a.csv `
   --right output\reviewer-b.csv `
   --disagreements-output output\review-disagreements.csv `
   --json-output output\review-agreement.json
+
+.\.venv\Scripts\python.exe -m painfinder benchmark compare-results `
+  --before output\benchmark-before.json `
+  --after output\benchmark-after.json `
+  --output output\benchmark-comparison.json
 ```
 
-The comparison rejects changed source evidence or different evidence IDs, records agreement rate, and emits only disputed labels for human adjudication.
+`audit-corpus` enforces the minimum structural prerequisites for calibration. `compare-reviews` rejects source-evidence changes and produces a disagreement queue without resolving labels. `compare-results` records exact metric and error-count deltas without declaring a winner automatically.
+
+## Safe mechanical repair and verification
+
+For formatter, import-order and other Ruff-safe mechanical problems, use:
+
+```powershell
+powershell -ExecutionPolicy Bypass -File .\scripts\auto-repair-and-verify.ps1
+```
+
+Add `-IncludeHackerNewsSmoke` for the official-source mode.
+
+The repair workflow:
+
+- requires a clean tracked branch;
+- refuses detached HEAD, missing remote branches and unpushed commits;
+- applies only Ruff formatting and safe fixes;
+- rejects any changed non-Python file;
+- runs the complete verification before committing repairs;
+- commits and pushes only verified mechanical changes;
+- synchronizes the pushed branch and verifies it again.
+
+The authoritative verification remains read-only. A locally repaired but uncommitted tree is never accepted as proof of a remote PR head.
 
 ## Run the benchmark
 
@@ -77,25 +98,6 @@ The comparison rejects changed source evidence or different evidence IDs, record
   --html-output output\benchmark-results.html
 ```
 
-## Compare before and after results
-
-Record exact metric and error-count deltas for a detector or clustering change:
-
-```powershell
-.\.venv\Scripts\python.exe -m painfinder benchmark compare-results `
-  --before output\benchmark-before.json `
-  --after output\benchmark-after.json `
-  --output output\benchmark-comparison.json
-```
-
-The command does not declare a winner. Review the deltas together with false positives, false negatives, fragmentation and over-merging.
-
-## Complete verification wrapper
-
-`update-and-verify.ps1` verifies the branch that is currently selected. It fetches `origin`, refuses detached HEAD, refuses a missing remote branch, and refuses to reset a branch containing unpushed commits. It synchronizes that same branch and runs the complete MVP gate plus the calibration-control integration verifier.
-
-The wrapper does not switch to a hard-coded release branch.
-
 ## Metrics
 
 - pain-detection precision and recall;
@@ -105,8 +107,8 @@ The wrapper does not switch to a hard-coded release branch.
 - fragmented expected evidence pairs;
 - over-merged evidence pairs.
 
-The included fixtures are deliberately small and prove evaluator and control behavior only. They are not representative market corpora. Detector or clustering changes must eventually be compared on a larger reviewed corpus with multiple communities and workflows.
+The included fixture is deliberately small and proves evaluator behavior only. It is not a representative market corpus. Detector or clustering changes must eventually be compared on a larger reviewed corpus with multiple communities and workflows.
 
-Do not choose target thresholds from the included fixtures. Establish thresholds only after the reviewed corpus meets the minimum quality conditions in the review protocol and the cost of false positives, false negatives, fragmentation and over-merging has been explicitly considered.
+Do not choose target thresholds from the included fixture. Establish thresholds only after the reviewed corpus meets the minimum quality conditions in the review protocol and the cost of false positives, false negatives, fragmentation and over-merging has been explicitly considered.
 
 Benchmark metrics do not measure market size, commercial demand, willingness to pay, or implementation feasibility.
