@@ -44,6 +44,51 @@ The importer validates the complete worksheet before writing output. Every row m
 
 The importer never creates labels or tunes detector rules.
 
+## Automated calibration controls
+
+The project automates all objective evidence controls around human review:
+
+```powershell
+.\.venv\Scripts\python.exe -m painfinder benchmark audit-corpus `
+  --corpus output\reviewed-benchmark-corpus.jsonl `
+  --json-output output\benchmark-corpus-audit.json
+
+.\.venv\Scripts\python.exe -m painfinder benchmark compare-reviews `
+  --left output\reviewer-a.csv `
+  --right output\reviewer-b.csv `
+  --disagreements-output output\review-disagreements.csv `
+  --json-output output\review-agreement.json
+
+.\.venv\Scripts\python.exe -m painfinder benchmark compare-results `
+  --before output\benchmark-before.json `
+  --after output\benchmark-after.json `
+  --output output\benchmark-comparison.json
+```
+
+`audit-corpus` enforces the minimum structural prerequisites for calibration. `compare-reviews` rejects source-evidence changes and produces a disagreement queue without resolving labels. `compare-results` records exact metric and error-count deltas without declaring a winner automatically.
+
+## Safe mechanical repair and verification
+
+For formatter, import-order and other Ruff-safe mechanical problems, use:
+
+```powershell
+powershell -ExecutionPolicy Bypass -File .\scripts\auto-repair-and-verify.ps1
+```
+
+Add `-IncludeHackerNewsSmoke` for the official-source mode.
+
+The repair workflow:
+
+- requires a clean tracked branch;
+- refuses detached HEAD, missing remote branches and unpushed commits;
+- applies only Ruff formatting and safe fixes;
+- rejects any changed non-Python file;
+- runs the complete verification before committing repairs;
+- commits and pushes only verified mechanical changes;
+- synchronizes the pushed branch and verifies it again.
+
+The authoritative verification remains read-only. A locally repaired but uncommitted tree is never accepted as proof of a remote PR head.
+
 ## Run the benchmark
 
 ```powershell

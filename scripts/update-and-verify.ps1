@@ -44,17 +44,39 @@ if ($Status) {
     throw "Commit, stash, or discard local changes before verification."
 }
 
+$Branch = (& git branch --show-current).Trim()
+if ($LASTEXITCODE -ne 0 -or -not $Branch) {
+    throw "Verification requires a named local branch, not detached HEAD."
+}
+
 Invoke-CheckedGit -Step "Git fetch" -Arguments @("fetch", "origin")
+
+& git rev-parse --verify "origin/$Branch" 2>$null | Out-Null
+if ($LASTEXITCODE -ne 0) {
+    throw "Remote branch origin/$Branch does not exist. Push the branch before verification."
+}
+
+$Divergence = (& git rev-list --left-right --count "origin/$Branch...$Branch").Trim()
+if ($LASTEXITCODE -ne 0) {
+    throw "Could not compare $Branch with origin/$Branch."
+}
+$Counts = $Divergence -split "\s+"
+$RemoteOnly = [int]$Counts[0]
+$LocalOnly = [int]$Counts[1]
+if ($LocalOnly -gt 0) {
+    throw "$Branch contains $LocalOnly unpushed commit(s); refusing to reset it."
+}
+
 Invoke-CheckedGit -Step "Branch synchronization" -Arguments @(
     "switch",
     "-C",
-    "feat/release-readiness",
-    "origin/feat/release-readiness"
+    $Branch,
+    "origin/$Branch"
 )
 
-$Branch = (& git branch --show-current).Trim()
-if ($LASTEXITCODE -ne 0 -or $Branch -ne "feat/release-readiness") {
-    throw "Expected feat/release-readiness, found $Branch"
+$VerifiedBranch = (& git branch --show-current).Trim()
+if ($LASTEXITCODE -ne 0 -or $VerifiedBranch -ne $Branch) {
+    throw "Expected $Branch after synchronization, found $VerifiedBranch"
 }
 
 $Commit = (& git rev-parse HEAD).Trim()
@@ -62,8 +84,9 @@ if ($LASTEXITCODE -ne 0) {
     throw "Could not resolve the verification commit."
 }
 
-Write-Host "Verification branch: $Branch" -ForegroundColor Green
+Write-Host "Verification branch: $VerifiedBranch" -ForegroundColor Green
 Write-Host "Verification commit: $Commit" -ForegroundColor Green
+Write-Host "Remote commits applied: $RemoteOnly" -ForegroundColor Green
 
 $VerificationScript = Join-Path $ProjectPath "scripts\verify-mvp.ps1"
 if (-not (Test-Path $VerificationScript)) {
@@ -76,3 +99,22 @@ if ($IncludeHackerNewsSmoke) {
 else {
     & $VerificationScript
 }
+
+$EvidenceRoot = Get-ChildItem (Join-Path $ProjectPath "artifacts\verification") -Directory |
+    Sort-Object LastWriteTimeUtc -Descending |
+    Select-Object -First 1
+if ($null -eq $EvidenceRoot) {
+    throw "Verification evidence directory was not created."
+}
+
+$CalibrationScript = Join-Path $ProjectPath "scripts\verify-calibration-controls.ps1"
+$ControlCorpus = Join-Path $ProjectPath "tests\fixtures\benchmark_calibration_control.jsonl"
+$Python = Join-Path $ProjectPath ".venv\Scripts\python.exe"
+& $CalibrationScript `
+    -Python $Python `
+    -EvidenceRoot $EvidenceRoot.FullName `
+    -ReviewWorksheet (Join-Path $EvidenceRoot.FullName "benchmark-review-worksheet.csv") `
+    -BenchmarkJson (Join-Path $EvidenceRoot.FullName "benchmark.json") `
+    -ControlCorpus $ControlCorpus
+
+Write-Host "PASS: synchronized and verified $VerifiedBranch at $Commit." -ForegroundColor Green
