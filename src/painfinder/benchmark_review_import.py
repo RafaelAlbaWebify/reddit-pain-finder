@@ -8,7 +8,7 @@ from pathlib import Path
 from pydantic import ValidationError
 
 from painfinder.benchmark_review import REVIEW_COLUMNS
-from painfinder.domain import PainCategory, SourceItem, SourceType
+from painfinder.domain import PainCategory, SourceItem
 
 
 class ReviewWorksheetError(RuntimeError):
@@ -88,15 +88,17 @@ def _case_from_row(
         )
 
     try:
-        item = SourceItem(
-            external_id=external_id,
-            source_type=SourceType(text("source_type")),
-            title=text("title"),
-            body=row.get("body") or "",
-            subreddit=text("community") or None,
-            canonical_url=text("canonical_url"),
+        item = SourceItem.model_validate(
+            {
+                "external_id": external_id,
+                "source_type": text("source_type"),
+                "title": text("title"),
+                "body": row.get("body") or "",
+                "subreddit": text("community") or None,
+                "canonical_url": text("canonical_url"),
+            }
         )
-    except (ValueError, ValidationError) as error:
+    except ValidationError as error:
         raise _line_error(line_number, f"invalid source item: {error}") from error
 
     return {
