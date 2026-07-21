@@ -130,9 +130,7 @@ def build_provisional_review_command(
             help="Reviewer JSONL. Supply exactly three --reviewer-output values.",
         ),
     ],
-    provisional_output: Annotated[Path, typer.Option()] = Path(
-        "output/provisional-review.csv"
-    ),
+    provisional_output: Annotated[Path, typer.Option()] = Path("output/provisional-review.csv"),
     approval_queue_output: Annotated[Path, typer.Option()] = Path(
         "output/human-approval-queue.csv"
     ),
@@ -191,10 +189,7 @@ def promote_human_approvals_command(
         typer.echo(f"ERROR: {error}")
         raise typer.Exit(code=2) from error
 
-    typer.echo(
-        f"PASS: promoted {approved_count} human-approved row(s); "
-        f"excluded={excluded_count}"
-    )
+    typer.echo(f"PASS: promoted {approved_count} human-approved row(s); excluded={excluded_count}")
     typer.echo(f"Resolved worksheet: {resolved_worksheet_output}")
     typer.echo(f"Gold corpus: {gold_corpus_output}")
 

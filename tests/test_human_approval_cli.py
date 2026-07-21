@@ -72,9 +72,7 @@ def test_only_explicitly_approved_rows_enter_gold(tmp_path: Path) -> None:
     assert "promoted 1" in result.stdout
     assert "excluded=1" in result.stdout
     cases = [
-        json.loads(line)
-        for line in corpus.read_text(encoding="utf-8").splitlines()
-        if line.strip()
+        json.loads(line) for line in corpus.read_text(encoding="utf-8").splitlines() if line.strip()
     ]
     assert [case["item"]["external_id"] for case in cases] == ["approved"]
     with worksheet.open(encoding="utf-8", newline="") as handle:

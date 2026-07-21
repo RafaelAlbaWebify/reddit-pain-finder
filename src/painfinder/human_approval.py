@@ -79,8 +79,7 @@ def _load_approved_rows(path: Path) -> tuple[list[dict[str, str]], int]:
         external_id = (row.get("external_id") or "").strip()
         if not external_id or external_id in seen_ids:
             raise HumanApprovalError(
-                f"Invalid approval queue line {line_number}: "
-                "IDs must be non-empty and unique"
+                f"Invalid approval queue line {line_number}: IDs must be non-empty and unique"
             )
         seen_ids.add(external_id)
 
