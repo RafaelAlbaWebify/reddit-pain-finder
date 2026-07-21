@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import argparse
 import csv
 import json
 import os
@@ -226,3 +227,30 @@ def _evidence_prompt(evidence: dict[str, str]) -> str:
         },
         separators=(",", ":"),
     )
+
+
+def main() -> int:
+    parser = argparse.ArgumentParser(
+        description="Run three isolated OpenAI-compatible HTTP review profiles."
+    )
+    parser.add_argument("--blind-packet", type=Path, required=True)
+    parser.add_argument("--config", type=Path, required=True)
+    parser.add_argument("--output-directory", type=Path, required=True)
+    arguments = parser.parse_args()
+    try:
+        outputs = run_http_ai_reviews(
+            arguments.blind_packet,
+            arguments.config,
+            output_directory=arguments.output_directory,
+        )
+    except AIReviewRunnerError as error:
+        print(f"ERROR: {error}")
+        return 2
+    print(f"PASS: wrote three isolated reviewer outputs to {arguments.output_directory}")
+    for output in outputs:
+        print(output)
+    return 0
+
+
+if __name__ == "__main__":
+    raise SystemExit(main())
