@@ -78,7 +78,10 @@ def prepare_review(
 
 @benchmark_app.command("prepare-blind-review")
 def prepare_blind_review(
-    run_id: Annotated[str, typer.Option()],
+    run_id: Annotated[
+        list[str],
+        typer.Option(help="Completed run ID. Repeat --run-id to combine runs."),
+    ],
     sample_size: Annotated[int, typer.Option(min=1)] = 100,
     database: Annotated[Path, typer.Option(exists=True, readable=True)] = Path("data/research.db"),
     reviewer_a_output: Annotated[Path, typer.Option()] = Path("output/reviewer-a.csv"),
@@ -104,8 +107,9 @@ def prepare_blind_review(
         raise typer.Exit(code=2) from error
 
     typer.echo(
-        f"PASS: selected {result.selected_count} of {result.available_count} item(s); "
-        f"communities={len(result.communities)}, source_types={len(result.source_types)}, "
+        f"PASS: selected {result.selected_count} of {result.available_count} item(s) "
+        f"from {len(result.run_ids)} run(s); communities={len(result.communities)}, "
+        f"source_types={len(result.source_types)}, "
         f"near_duplicates_excluded={result.excluded_near_duplicates}"
     )
     typer.echo(f"Reviewer A: {reviewer_a_output}")
