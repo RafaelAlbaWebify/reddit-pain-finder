@@ -50,6 +50,23 @@ if ($LASTEXITCODE -ne 0 -or -not $Branch) {
 }
 
 Invoke-CheckedGit -Step "Git fetch" -Arguments @("fetch", "origin")
+
+& git rev-parse --verify "origin/$Branch" 2>$null | Out-Null
+if ($LASTEXITCODE -ne 0) {
+    throw "Remote branch origin/$Branch does not exist. Push the branch before verification."
+}
+
+$Divergence = (& git rev-list --left-right --count "origin/$Branch...$Branch").Trim()
+if ($LASTEXITCODE -ne 0) {
+    throw "Could not compare $Branch with origin/$Branch."
+}
+$Counts = $Divergence -split "\s+"
+$RemoteOnly = [int]$Counts[0]
+$LocalOnly = [int]$Counts[1]
+if ($LocalOnly -gt 0) {
+    throw "$Branch contains $LocalOnly unpushed commit(s); refusing to reset it."
+}
+
 Invoke-CheckedGit -Step "Branch synchronization" -Arguments @(
     "switch",
     "-C",
@@ -69,6 +86,7 @@ if ($LASTEXITCODE -ne 0) {
 
 Write-Host "Verification branch: $VerifiedBranch" -ForegroundColor Green
 Write-Host "Verification commit: $Commit" -ForegroundColor Green
+Write-Host "Remote commits applied: $RemoteOnly" -ForegroundColor Green
 
 $VerificationScript = Join-Path $ProjectPath "scripts\verify-mvp.ps1"
 if (-not (Test-Path $VerificationScript)) {
