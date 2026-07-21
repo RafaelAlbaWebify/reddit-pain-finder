@@ -11,6 +11,13 @@ from painfinder.benchmark import (
     load_benchmark,
     write_benchmark_results,
 )
+from painfinder.benchmark_calibration import (
+    CalibrationError,
+    audit_corpus,
+    compare_benchmark_results,
+    compare_review_worksheets,
+    write_corpus_audit,
+)
 from painfinder.benchmark_review import write_review_worksheet
 from painfinder.benchmark_review_import import (
     ReviewWorksheetError,
@@ -94,3 +101,81 @@ def import_review(
 
     typer.echo(f"PASS: imported {case_count} resolved benchmark case(s)")
     typer.echo(f"Corpus: {output}")
+
+
+@benchmark_app.command("audit-corpus")
+def audit_reviewed_corpus(
+    corpus: Annotated[Path, typer.Option(exists=True, readable=True)],
+    json_output: Annotated[Path, typer.Option()] = Path(
+        "output/benchmark-corpus-audit.json"
+    ),
+) -> None:
+    """Check reviewed-corpus prerequisites before calibration."""
+    try:
+        audit = audit_corpus(corpus)
+    except CalibrationError as error:
+        typer.echo(f"ERROR: {error}")
+        raise typer.Exit(code=2) from error
+    write_corpus_audit(audit, json_output)
+    if not audit.passed:
+        failed = ", ".join(name for name, passed in audit.checks.items() if not passed)
+        typer.echo(f"ERROR: corpus audit failed: {failed}")
+        typer.echo(f"JSON: {json_output}")
+        raise typer.Exit(code=2)
+    typer.echo(
+        f"PASS: corpus audit passed for {audit.case_count} case(s), "
+        f"{len(audit.communities)} communities and {len(audit.categories)} categories"
+    )
+    typer.echo(f"JSON: {json_output}")
+
+
+@benchmark_app.command("compare-reviews")
+def compare_reviews(
+    left: Annotated[Path, typer.Option(exists=True, readable=True)],
+    right: Annotated[Path, typer.Option(exists=True, readable=True)],
+    disagreements_output: Annotated[Path, typer.Option()] = Path(
+        "output/benchmark-review-disagreements.csv"
+    ),
+    json_output: Annotated[Path, typer.Option()] = Path(
+        "output/benchmark-review-agreement.json"
+    ),
+) -> None:
+    """Compare two independent worksheets and produce a dispute queue."""
+    try:
+        summary = compare_review_worksheets(
+            left,
+            right,
+            disagreements_output=disagreements_output,
+            summary_output=json_output,
+        )
+    except CalibrationError as error:
+        typer.echo(f"ERROR: {error}")
+        raise typer.Exit(code=2) from error
+    typer.echo(
+        f"PASS: compared {summary['item_count']} item(s); "
+        f"agreements={summary['agreement_count']}, "
+        f"disagreements={summary['disagreement_count']}"
+    )
+    typer.echo(f"Disagreements: {disagreements_output}")
+    typer.echo(f"JSON: {json_output}")
+
+
+@benchmark_app.command("compare-results")
+def compare_results(
+    before: Annotated[Path, typer.Option(exists=True, readable=True)],
+    after: Annotated[Path, typer.Option(exists=True, readable=True)],
+    output: Annotated[Path, typer.Option()] = Path(
+        "output/benchmark-result-comparison.json"
+    ),
+) -> None:
+    """Record exact before/after benchmark metric and error-count deltas."""
+    try:
+        comparison = compare_benchmark_results(before, after, output)
+    except (CalibrationError, KeyError, TypeError, ValueError) as error:
+        typer.echo(f"ERROR: {error}")
+        raise typer.Exit(code=2) from error
+    typer.echo(
+        "PASS: compared benchmark results; "
+        f"same_case_count={comparison['same_case_count']}"
+    )
+    typer.echo(f"JSON: {output}")
