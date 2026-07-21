@@ -48,8 +48,21 @@ Cluster IDs are reviewed topic identities, not detector keys.
 
 Human reviewers remain responsible only for semantic labels and dispute resolution. The project automates the surrounding evidence controls.
 
-1. Export the same unlabeled worksheet for two independent reviewers.
-2. Reviewers label copies without detector output.
+1. Generate balanced, deduplicated and identical blind reviewer packets from a stored run:
+
+```powershell
+.\.venv\Scripts\python.exe -m painfinder benchmark prepare-blind-review `
+  --run-id <RUN_ID> `
+  --database data\research.db `
+  --sample-size 100 `
+  --reviewer-a-output output\reviewer-a.csv `
+  --reviewer-b-output output\reviewer-b.csv `
+  --manifest-output output\review-sampling.json
+```
+
+The sampler is deterministic. It balances across available community and source-type buckets, removes exact and near-duplicate content, leaves every label blank, and writes a manifest containing the selected IDs and exclusion counts. It does not use detector output or create labels.
+
+2. Reviewers label their copies independently without detector output.
 3. Compare the worksheets:
 
 ```powershell
