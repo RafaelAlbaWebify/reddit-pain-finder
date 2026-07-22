@@ -2,13 +2,15 @@ from __future__ import annotations
 
 import argparse
 import csv
+import ipaddress
 import json
 import os
 import time
 import urllib.error
+import urllib.parse
 import urllib.request
 from pathlib import Path
-from typing import Any
+from typing import Any, Literal
 
 from pydantic import BaseModel, Field, ValidationError, field_validator
 
@@ -24,19 +26,31 @@ class ReviewerProfile(BaseModel):
     name: str = Field(min_length=1)
     endpoint: str = Field(min_length=1)
     model: str = Field(min_length=1)
-    api_key_env: str = Field(min_length=1)
+    api_key_env: str | None = None
     system_prompt: str = Field(min_length=1)
     temperature: float = Field(default=0.0, ge=0.0, le=2.0)
     timeout_seconds: float = Field(default=60.0, gt=0.0, le=300.0)
     retries: int = Field(default=2, ge=0, le=5)
+    reasoning_effort: Literal["none", "low", "medium", "high"] | None = None
 
     @field_validator("endpoint")
     @classmethod
-    def require_https(cls, value: str) -> str:
+    def require_secure_endpoint(cls, value: str) -> str:
         normalized = value.strip()
-        if not normalized.startswith("https://"):
-            raise ValueError("endpoint must use https")
-        return normalized
+        parsed = urllib.parse.urlparse(normalized)
+        if parsed.scheme == "https" and parsed.hostname:
+            return normalized
+        if parsed.scheme == "http" and _is_loopback_host(parsed.hostname):
+            return normalized
+        raise ValueError("endpoint must use https, except loopback HTTP is allowed")
+
+    @field_validator("api_key_env")
+    @classmethod
+    def normalize_api_key_env(cls, value: str | None) -> str | None:
+        if value is None:
+            return None
+        normalized = value.strip()
+        return normalized or None
 
 
 class ReviewRunnerConfig(BaseModel):
@@ -97,10 +111,18 @@ def run_http_ai_reviews(
 
 def _load_config(path: Path) -> ReviewRunnerConfig:
     try:
-        payload = json.loads(path.read_text(encoding="utf-8"))
-        return ReviewRunnerConfig.model_validate(payload)
+        payload = json.loads(path.read_text(encoding="utf-8-sig"))
+        config = ReviewRunnerConfig.model_validate(payload)
     except (OSError, json.JSONDecodeError, ValidationError) as error:
         raise AIReviewRunnerError(f"Invalid reviewer configuration: {error}") from error
+
+    for profile in config.reviewers:
+        parsed = urllib.parse.urlparse(profile.endpoint)
+        if profile.api_key_env is None and not _is_loopback_host(parsed.hostname):
+            raise AIReviewRunnerError(
+                f"Reviewer {profile.name} requires api_key_env for non-loopback endpoints"
+            )
+    return config
 
 
 def _load_blind_packet(path: Path) -> dict[str, dict[str, str]]:
@@ -130,21 +152,26 @@ def _load_blind_packet(path: Path) -> dict[str, dict[str, str]]:
 
 
 def _review_item(profile: ReviewerProfile, evidence: dict[str, str]) -> ReviewerDecision:
-    api_key = os.environ.get(profile.api_key_env, "").strip()
-    if not api_key:
-        raise AIReviewRunnerError(
-            f"Reviewer {profile.name} requires environment variable {profile.api_key_env}"
-        )
-
-    request_payload = {
+    api_key = _api_key(profile)
+    request_payload: dict[str, Any] = {
         "model": profile.model,
         "temperature": profile.temperature,
-        "response_format": {"type": "json_object"},
+        "response_format": {
+            "type": "json_schema",
+            "json_schema": {
+                "name": "painfinder_reviewer_decision",
+                "strict": True,
+                "schema": ReviewerDecision.model_json_schema(),
+            },
+        },
         "messages": [
             {"role": "system", "content": profile.system_prompt},
             {"role": "user", "content": _evidence_prompt(evidence)},
         ],
     }
+    if profile.reasoning_effort is not None:
+        request_payload["reasoning_effort"] = profile.reasoning_effort
+
     raw_response = _post_json(profile, api_key, request_payload)
     try:
         completion = ChatCompletionResponse.model_validate(raw_response)
@@ -163,18 +190,29 @@ def _review_item(profile: ReviewerProfile, evidence: dict[str, str]) -> Reviewer
     return decision
 
 
+def _api_key(profile: ReviewerProfile) -> str | None:
+    if profile.api_key_env is None:
+        return None
+    api_key = os.environ.get(profile.api_key_env, "").strip()
+    if not api_key:
+        raise AIReviewRunnerError(
+            f"Reviewer {profile.name} requires environment variable {profile.api_key_env}"
+        )
+    return api_key
+
+
 def _post_json(
     profile: ReviewerProfile,
-    api_key: str,
+    api_key: str | None,
     payload: dict[str, Any],
 ) -> dict[str, Any]:
+    headers = {"Content-Type": "application/json"}
+    if api_key is not None:
+        headers["Authorization"] = f"Bearer {api_key}"
     request = urllib.request.Request(
         profile.endpoint,
         data=json.dumps(payload).encode("utf-8"),
-        headers={
-            "Authorization": f"Bearer {api_key}",
-            "Content-Type": "application/json",
-        },
+        headers=headers,
         method="POST",
     )
     attempts = profile.retries + 1
@@ -196,6 +234,18 @@ def _post_json(
                 ) from error
             time.sleep(min(2 ** (attempt - 1), 4))
     raise AssertionError("unreachable")
+
+
+def _is_loopback_host(hostname: str | None) -> bool:
+    if hostname is None:
+        return False
+    normalized = hostname.rstrip(".").lower()
+    if normalized == "localhost":
+        return True
+    try:
+        return ipaddress.ip_address(normalized).is_loopback
+    except ValueError:
+        return False
 
 
 def _evidence_prompt(evidence: dict[str, str]) -> str:

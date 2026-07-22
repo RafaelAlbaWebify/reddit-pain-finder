@@ -1,76 +1,67 @@
 # HTTP AI review runner
 
-The runner executes exactly three isolated OpenAI-compatible HTTP reviewer profiles and writes the JSONL files consumed by `benchmark build-provisional-review`.
+The runner executes exactly three isolated OpenAI-compatible reviewer profiles and writes the JSONL files consumed by `benchmark build-provisional-review`.
 
 ## Safety and provenance
 
-- Endpoints must use HTTPS.
-- API keys are read only from named environment variables.
-- Configuration files contain no secret values.
-- Each returned decision is validated against the existing `ReviewerDecision` schema.
-- The returned `external_id` must match the evidence item exactly.
+- Remote endpoints must use HTTPS.
+- Plain HTTP is accepted only for loopback hosts such as `localhost`, `127.0.0.1`, and `::1`.
+- Remote API keys are read only from named environment variables.
+- Loopback reviewers may omit `api_key_env` because the local Ollama API does not require authentication.
+- Each request asks for a strict JSON schema derived from `ReviewerDecision`.
+- Each returned decision is validated against that schema and must preserve the exact evidence `external_id`.
 - Reviewer files are replaced only after all three profiles complete successfully.
 - AI outputs remain provisional and are not human-approved ground truth.
 
-## Configuration
+## Local Ollama configuration
 
-Create a local JSON file that is not committed with three reviewer profiles:
+Create a local file such as `local/reviewers-ollama.json`. Do not commit operational configuration files.
 
 ```json
 {
   "reviewers": [
     {
-      "name": "reviewer-a",
-      "endpoint": "https://provider.example/v1/chat/completions",
-      "model": "model-a",
-      "api_key_env": "PAINFINDER_REVIEWER_A_KEY",
-      "system_prompt": "Assess only the supplied evidence. Return the required JSON object.",
+      "name": "local-conservative",
+      "endpoint": "http://127.0.0.1:11434/v1/chat/completions",
+      "model": "qwen3:1.7b",
+      "system_prompt": "Assess only explicit evidence of a real user problem. Be conservative. Return only the required JSON object.",
       "temperature": 0,
-      "timeout_seconds": 60,
-      "retries": 2
+      "timeout_seconds": 180,
+      "retries": 1,
+      "reasoning_effort": "none"
     },
     {
-      "name": "reviewer-b",
-      "endpoint": "https://provider.example/v1/chat/completions",
-      "model": "model-b",
-      "api_key_env": "PAINFINDER_REVIEWER_B_KEY",
-      "system_prompt": "Review independently and conservatively. Return only the required JSON object.",
-      "temperature": 0,
-      "timeout_seconds": 60,
-      "retries": 2
+      "name": "local-opportunity",
+      "endpoint": "http://127.0.0.1:11434/v1/chat/completions",
+      "model": "qwen3:1.7b",
+      "system_prompt": "Assess independently whether the evidence describes a recurring customer pain or workaround. Return only the required JSON object.",
+      "temperature": 0.1,
+      "timeout_seconds": 180,
+      "retries": 1,
+      "reasoning_effort": "none"
     },
     {
-      "name": "reviewer-c",
-      "endpoint": "https://provider.example/v1/chat/completions",
-      "model": "model-c",
-      "api_key_env": "PAINFINDER_REVIEWER_C_KEY",
-      "system_prompt": "Challenge ambiguous pain claims. Return only the required JSON object.",
-      "temperature": 0,
-      "timeout_seconds": 60,
-      "retries": 2
+      "name": "local-skeptical",
+      "endpoint": "http://127.0.0.1:11434/v1/chat/completions",
+      "model": "qwen3:1.7b",
+      "system_prompt": "Challenge weak or ambiguous pain claims and avoid inferring facts not present in the evidence. Return only the required JSON object.",
+      "temperature": 0.2,
+      "timeout_seconds": 180,
+      "retries": 1,
+      "reasoning_effort": "none"
     }
   ]
 }
 ```
 
-The three profiles may use different providers or models as long as each endpoint accepts an OpenAI-compatible chat-completions request and returns `choices[0].message.content` containing one JSON decision.
+Using one model with different prompts is useful for a zero-cost pilot, but it is not equivalent to three genuinely independent models. Consensus from these profiles remains provisional.
 
-## Run
-
-Set the environment variables in the current PowerShell session:
-
-```powershell
-$env:PAINFINDER_REVIEWER_A_KEY = "..."
-$env:PAINFINDER_REVIEWER_B_KEY = "..."
-$env:PAINFINDER_REVIEWER_C_KEY = "..."
-```
-
-Execute the three passes:
+Run the local passes:
 
 ```powershell
 .\.venv\Scripts\python.exe -m painfinder.ai_review_http `
-  --blind-packet output\reviewer-a.csv `
-  --config .\local\reviewers.json `
+  --blind-packet output\pilot-review-packet.csv `
+  --config .\local\reviewers-ollama.json `
   --output-directory output\ai-reviews
 ```
 
@@ -80,14 +71,31 @@ This writes:
 - `output/ai-reviews/reviewer-2.jsonl`
 - `output/ai-reviews/reviewer-3.jsonl`
 
-Then build consensus and the human approval queue:
+## Remote provider configuration
+
+Remote profiles must use HTTPS and name an environment variable containing the API key:
+
+```json
+{
+  "name": "remote-reviewer",
+  "endpoint": "https://provider.example/v1/chat/completions",
+  "model": "model-name",
+  "api_key_env": "PAINFINDER_REVIEWER_KEY",
+  "system_prompt": "Review independently and return only the required JSON object.",
+  "temperature": 0,
+  "timeout_seconds": 60,
+  "retries": 2
+}
+```
+
+Never put a secret value inside the configuration file.
+
+## Build consensus
 
 ```powershell
 .\.venv\Scripts\python.exe -m painfinder benchmark build-provisional-review `
-  --blind-packet output\reviewer-a.csv `
+  --blind-packet output\pilot-review-packet.csv `
   --reviewer-output output\ai-reviews\reviewer-1.jsonl `
   --reviewer-output output\ai-reviews\reviewer-2.jsonl `
   --reviewer-output output\ai-reviews\reviewer-3.jsonl
 ```
-
-Never commit the local configuration when it contains operational endpoint details, and never place API keys inside it.
