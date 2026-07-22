@@ -48,15 +48,20 @@ def _packet(path: Path) -> None:
         )
 
 
-def _config(path: Path) -> None:
+def _config(path: Path, *, local: bool = False) -> None:
     profile = {
-        "endpoint": "https://example.com/v1/chat/completions",
+        "endpoint": (
+            "http://127.0.0.1:11434/v1/chat/completions"
+            if local
+            else "https://example.com/v1/chat/completions"
+        ),
         "model": "review-model",
-        "api_key_env": "REVIEW_API_KEY",
+        "api_key_env": None if local else "REVIEW_API_KEY",
         "system_prompt": "Review independently.",
         "temperature": 0,
         "timeout_seconds": 5,
         "retries": 0,
+        "reasoning_effort": "none" if local else None,
     }
     path.write_text(
         json.dumps(
@@ -108,6 +113,32 @@ def test_runner_writes_three_valid_outputs(
         assert rows[0]["expected_categories"] == ["manual_work"]
 
 
+def test_loopback_http_requires_no_api_key_and_disables_reasoning(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    packet = tmp_path / "packet.csv"
+    config = tmp_path / "config.json"
+    output = tmp_path / "reviews"
+    captured: list[Any] = []
+    _packet(packet)
+    _config(config, local=True)
+
+    def fake_urlopen(request: Any, timeout: float) -> _Response:
+        captured.append(request)
+        return _Response(_completion())
+
+    monkeypatch.setattr("painfinder.ai_review_http.urllib.request.urlopen", fake_urlopen)
+
+    run_http_ai_reviews(packet, config, output_directory=output)
+
+    assert len(captured) == 3
+    payload = json.loads(captured[0].data.decode("utf-8"))
+    assert payload["reasoning_effort"] == "none"
+    assert payload["response_format"]["type"] == "json_schema"
+    assert "Authorization" not in dict(captured[0].header_items())
+
+
 def test_runner_requires_environment_key(tmp_path: Path) -> None:
     packet = tmp_path / "packet.csv"
     config = tmp_path / "config.json"
@@ -140,26 +171,40 @@ def test_runner_rejects_wrong_evidence_id_atomically(
     assert not list(output.glob("*.tmp"))
 
 
-def test_config_requires_exactly_three_https_profiles(tmp_path: Path) -> None:
+@pytest.mark.parametrize(
+    "endpoint",
+    [
+        "http://example.com/v1/chat/completions",
+        "http://192.168.1.20:11434/v1/chat/completions",
+    ],
+)
+def test_config_rejects_non_loopback_http(tmp_path: Path, endpoint: str) -> None:
     packet = tmp_path / "packet.csv"
     config = tmp_path / "config.json"
     _packet(packet)
-    config.write_text(
-        json.dumps(
-            {
-                "reviewers": [
-                    {
-                        "name": "a",
-                        "endpoint": "http://example.com",
-                        "model": "x",
-                        "api_key_env": "KEY",
-                        "system_prompt": "Review.",
-                    }
-                ]
-            }
-        ),
-        encoding="utf-8",
-    )
+    profile = {
+        "name": "a",
+        "endpoint": endpoint,
+        "model": "x",
+        "system_prompt": "Review.",
+    }
+    config.write_text(json.dumps({"reviewers": [profile, profile, profile]}), encoding="utf-8")
 
     with pytest.raises(AIReviewRunnerError, match="Invalid reviewer configuration"):
+        run_http_ai_reviews(packet, config, output_directory=tmp_path / "reviews")
+
+
+def test_remote_https_requires_api_key_setting(tmp_path: Path) -> None:
+    packet = tmp_path / "packet.csv"
+    config = tmp_path / "config.json"
+    _packet(packet)
+    profile = {
+        "name": "remote",
+        "endpoint": "https://example.com/v1/chat/completions",
+        "model": "x",
+        "system_prompt": "Review.",
+    }
+    config.write_text(json.dumps({"reviewers": [profile, profile, profile]}), encoding="utf-8")
+
+    with pytest.raises(AIReviewRunnerError, match="requires api_key_env"):
         run_http_ai_reviews(packet, config, output_directory=tmp_path / "reviews")
