@@ -111,7 +111,7 @@ def run_http_ai_reviews(
 
 def _load_config(path: Path) -> ReviewRunnerConfig:
     try:
-        payload = json.loads(path.read_text(encoding="utf-8"))
+        payload = json.loads(path.read_text(encoding="utf-8-sig"))
         config = ReviewRunnerConfig.model_validate(payload)
     except (OSError, json.JSONDecodeError, ValidationError) as error:
         raise AIReviewRunnerError(f"Invalid reviewer configuration: {error}") from error
