@@ -139,6 +139,27 @@ def test_loopback_http_requires_no_api_key_and_disables_reasoning(
     assert "Authorization" not in dict(captured[0].header_items())
 
 
+def test_runner_accepts_utf8_bom_configuration(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    packet = tmp_path / "packet.csv"
+    config = tmp_path / "config.json"
+    output = tmp_path / "reviews"
+    _packet(packet)
+    _config(config, local=True)
+    config.write_text(config.read_text(encoding="utf-8"), encoding="utf-8-sig")
+    monkeypatch.setattr(
+        "painfinder.ai_review_http.urllib.request.urlopen",
+        lambda request, timeout: _Response(_completion()),
+    )
+
+    paths = run_http_ai_reviews(packet, config, output_directory=output)
+
+    assert len(paths) == 3
+    assert all(path.exists() for path in paths)
+
+
 def test_runner_requires_environment_key(tmp_path: Path) -> None:
     packet = tmp_path / "packet.csv"
     config = tmp_path / "config.json"
