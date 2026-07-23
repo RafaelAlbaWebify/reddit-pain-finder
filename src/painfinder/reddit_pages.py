@@ -10,8 +10,9 @@ from painfinder.domain import SourceItem, SourceType
 
 BLOCK_PATTERNS = (
     "you've been blocked by network security",
+    "your request has been blocked",
+    "blocked due to a network policy",
     "whoa there, pardner",
-    "request blocked",
 )
 CAPTCHA_PATTERNS = (
     "captcha",
