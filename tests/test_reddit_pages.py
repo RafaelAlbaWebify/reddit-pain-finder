@@ -56,3 +56,16 @@ def test_missing_thread_container_returns_empty_collection() -> None:
         )
         == []
     )
+
+
+def test_incidental_block_words_in_discussion_are_normal() -> None:
+    html = """
+    <main>
+      <h1>Small-business discussion</h1>
+      <article>
+        My payment provider said the request blocked our checkout workflow,
+        but the community page itself loaded normally.
+      </article>
+    </main>
+    """
+    assert detect_page_state(html) is PageState.NORMAL
