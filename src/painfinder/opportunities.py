@@ -10,7 +10,9 @@ STOP_WORDS = {
     "about",
     "after",
     "again",
+    "also",
     "automatically",
+    "because",
     "before",
     "client",
     "could",
@@ -18,22 +20,114 @@ STOP_WORDS = {
     "from",
     "have",
     "into",
+    "just",
+    "like",
     "month",
+    "more",
     "need",
     "really",
+    "some",
     "that",
     "their",
     "there",
     "these",
     "they",
     "this",
+    "thing",
+    "things",
     "tool",
     "using",
+    "very",
     "what",
     "when",
     "with",
     "would",
+    "your",
 }
+
+_TOPIC_RULES: tuple[tuple[str, tuple[re.Pattern[str], ...]], ...] = (
+    (
+        "dark-mode-demand",
+        (
+            re.compile(r"\bdark mode\b"),
+            re.compile(r"\blight mode\b"),
+        ),
+    ),
+    (
+        "meta-account-recovery",
+        (
+            re.compile(r"\bfacebook\b.*\b(disabled|locked|verify|identity)\b"),
+            re.compile(r"\bmeta\b.*\baccount\b.*\bdisabled\b"),
+        ),
+    ),
+    (
+        "cold-outreach-trust",
+        (
+            re.compile(r"\bcold (email|emails|outreach|sell|selling)\b"),
+            re.compile(r"\bspanish\b.*\b(sell|business|relationship|trust)\b"),
+            re.compile(r"\bspain\b.*\b(sell|business|relationship|trust)\b"),
+        ),
+    ),
+    (
+        "failed-startup-asset-recovery",
+        (
+            re.compile(r"\bfailed startup"),
+            re.compile(r"\bgraveyard\b.*\bstartup"),
+            re.compile(r"\b(sold for parts|core assets|acqui-hire|shut down|shutdown)\b"),
+        ),
+    ),
+    (
+        "agency-platform-scaling",
+        (
+            re.compile(r"\bgohighlevel\b"),
+            re.compile(r"\boutgrowing\b.*\bplatform\b"),
+        ),
+    ),
+    (
+        "client-fit-and-onboarding-risk",
+        (
+            re.compile(r"\bprospect\b.*\b(gut|onboarding|red flag|fired|qualif)"),
+            re.compile(r"\b(gut|red flag|fired my team)\b.*\b(prospect|onboarding|client)"),
+        ),
+    ),
+    (
+        "client-requirements-clarity",
+        (
+            re.compile(r"\b(ask|asking) questions\b"),
+            re.compile(r"\bclarif(y|ied|ication)\b"),
+            re.compile(r"\bvision\b.*\b(onboarding|question|assume)\b"),
+            re.compile(r"\bimprove your onboarding process\b"),
+            re.compile(r"\bfiguring things out with you\b"),
+        ),
+    ),
+    (
+        "client-status-visibility",
+        (
+            re.compile(r"\b(progress|status|update)\b.*\bclient"),
+            re.compile(r"\bclient\b.*\b(progress|status|update|guess what)"),
+            re.compile(r"\banswer fast\b"),
+            re.compile(r"\bseen (their|the) message\b"),
+            re.compile(r"\b(clients?|client) guess what('s| is|s)? happening\b"),
+            re.compile(r"\bprogress is good\b"),
+        ),
+    ),
+    (
+        "scope-creep-management",
+        (
+            re.compile(
+                r"\b(out of scope|expand the scope|scope creep|last-minute change|"
+                r"ask for changes|charge for every)\b"
+            ),
+        ),
+    ),
+    (
+        "cash-flow-discipline",
+        (
+            re.compile(r"\b(cash flow|cash-poor|overspending|budgeting)\b"),
+            re.compile(r"\bpay yourself a fixed salary\b"),
+        ),
+    ),
+)
 
 
 @dataclass(frozen=True)
@@ -70,8 +164,25 @@ def build_opportunity_clusters(
 
 
 def _cluster_key(item: SourceItem) -> str:
-    tokens = _meaningful_tokens(f"{item.title} {item.body}")
+    text = _normalized_text(f"{item.title} {item.body}")
+    semantic_topic = _semantic_topic(text)
+    if semantic_topic is not None:
+        return semantic_topic
+
+    tokens = _meaningful_tokens(text)
     return "-".join(tokens[:3]) if tokens else "general"
+
+
+def _semantic_topic(text: str) -> str | None:
+    for topic, patterns in _TOPIC_RULES:
+        if any(pattern.search(text) for pattern in patterns):
+            return topic
+    return None
+
+
+def _normalized_text(text: str) -> str:
+    lowered = text.lower().replace("’", "'")
+    return " ".join(lowered.split())
 
 
 def _build_cluster(
