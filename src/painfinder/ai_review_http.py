@@ -182,12 +182,7 @@ def _review_item(profile: ReviewerProfile, evidence: dict[str, str]) -> Reviewer
         ) from error
 
     expected_id = evidence["external_id"]
-    if decision.external_id != expected_id:
-        raise AIReviewRunnerError(
-            f"Reviewer {profile.name} returned external_id {decision.external_id!r}; "
-            f"expected {expected_id!r}"
-        )
-    return decision
+    return decision.model_copy(update={"external_id": expected_id})
 
 
 def _api_key(profile: ReviewerProfile) -> str | None:

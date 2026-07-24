@@ -170,7 +170,7 @@ def test_runner_requires_environment_key(tmp_path: Path) -> None:
         run_http_ai_reviews(packet, config, output_directory=tmp_path / "reviews")
 
 
-def test_runner_rejects_wrong_evidence_id_atomically(
+def test_runner_binds_model_response_to_trusted_evidence_id(
     tmp_path: Path,
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
@@ -185,11 +185,16 @@ def test_runner_rejects_wrong_evidence_id_atomically(
         lambda request, timeout: _Response(_completion("wrong")),
     )
 
-    with pytest.raises(AIReviewRunnerError, match="expected 'item-1'"):
-        run_http_ai_reviews(packet, config, output_directory=output)
+    paths = run_http_ai_reviews(packet, config, output_directory=output)
 
-    assert not list(output.glob("reviewer-*.jsonl"))
-    assert not list(output.glob("*.tmp"))
+    assert len(paths) == 3
+    for path in paths:
+        rows = [
+            json.loads(line)
+            for line in path.read_text(encoding="utf-8").splitlines()
+        ]
+        assert rows[0]["external_id"] == "item-1"
+        assert rows[0]["expected_categories"] == ["manual_work"]
 
 
 @pytest.mark.parametrize(
