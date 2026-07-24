@@ -150,6 +150,12 @@ class SQLiteResearchRepository:
             CREATE INDEX IF NOT EXISTS idx_source_items_run_collected_at
                 ON source_items(run_id, collected_at);
 
+            CREATE INDEX IF NOT EXISTS idx_source_items_external_id
+                ON source_items(external_id);
+
+            CREATE INDEX IF NOT EXISTS idx_source_items_content_hash
+                ON source_items(content_hash);
+
             CREATE INDEX IF NOT EXISTS idx_pain_signals_run_category
                 ON pain_signals(run_id, category);
 

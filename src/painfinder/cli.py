@@ -6,6 +6,7 @@ import typer
 
 from painfinder.analysis import detect_pain_signals
 from painfinder.benchmark_cli import benchmark_app
+from painfinder.cross_run import filter_cross_run_duplicates
 from painfinder.domain import ResearchRun, SourceItem
 from painfinder.hacker_news_cli import hacker_news_app
 from painfinder.importers import ImportFormatError, deduplicate_items, import_source_items
@@ -71,12 +72,15 @@ def discover_store(
 ) -> None:
     """Run imported discovery and persist the complete research run."""
     imported = _import_or_exit(input)
-    items = deduplicate_items(imported)
-    signals = detect_pain_signals(items)
-    clusters = build_opportunity_clusters(items, signals)
+    within_run_items = deduplicate_items(imported)
 
     repository = SQLiteResearchRepository(database)
     repository.initialize()
+    deduplication = filter_cross_run_duplicates(database, within_run_items)
+    items = list(deduplication.items)
+    signals = detect_pain_signals(items)
+    clusters = build_opportunity_clusters(items, signals)
+
     run = repository.create_run(name, status="processing")
     repository.save_source_items(run.run_id, items)
     repository.save_pain_signals(run.run_id, signals)
@@ -90,6 +94,10 @@ def discover_store(
         "status": "completed",
         "database": str(database),
         "report": str(output),
+        "imported_items": len(imported),
+        "within_run_unique_items": len(within_run_items),
+        "cross_run_external_id_duplicates": deduplication.excluded_external_ids,
+        "cross_run_content_duplicates": deduplication.excluded_content_hashes,
         "source_items": len(items),
         "pain_signals": len(signals),
         "clusters": len(clusters),
@@ -99,8 +107,96 @@ def discover_store(
         json_output.write_text(json.dumps(result, indent=2), encoding="utf-8")
 
     typer.echo(
-        f"PASS: stored run {run.run_id} with {len(items)} source item(s), "
-        f"{len(signals)} pain signal(s), and {len(clusters)} cluster(s)"
+        f"PASS: stored run {run.run_id} with {len(items)} new source item(s), "
+        f"excluded {deduplication.excluded_external_ids} repeated ID(s) and "
+        f"{deduplication.excluded_content_hashes} repeated content item(s), "
+        f"found {len(signals)} pain signal(s), and built {len(clusters)} cluster(s)"
+    )
+    typer.echo(f"Database: {database}")
+    typer.echo(f"Report: {output}")
+    if json_output is not None:
+        typer.echo(f"Result: {json_output}")
+
+
+@app.command("live-store")
+def live_store(
+    subreddits: Annotated[str, typer.Option()],
+    name: Annotated[str, typer.Option()],
+    sort: Annotated[str, typer.Option()] = "new",
+    max_threads: Annotated[int, typer.Option(min=1, max=100)] = 25,
+    max_comments: Annotated[int, typer.Option(min=0, max=500)] = 8,
+    database: Annotated[Path, typer.Option()] = Path("data/research.db"),
+    artifacts_dir: Annotated[Path, typer.Option()] = Path("artifacts/live-store"),
+    output: Annotated[Path, typer.Option()] = Path("output/opportunities.html"),
+    json_output: Annotated[Path | None, typer.Option()] = None,
+) -> None:
+    """Collect bounded public Reddit evidence and persist only cross-run novel items."""
+    seeds = [item.strip() for item in subreddits.split(",") if item.strip()]
+    if not seeds:
+        typer.echo("ERROR: at least one subreddit is required")
+        raise typer.Exit(code=2)
+
+    policy = ResearchRun(
+        name=name,
+        max_pages=max_threads + len(seeds) + 2,
+        max_threads=max_threads,
+        max_comments_per_thread=max_comments,
+        max_runtime_seconds=1800,
+        live_access_enabled=True,
+        concurrency=1,
+        min_delay_seconds=2.0,
+    )
+    collection = PlaywrightRedditCollector(artifacts_dir=artifacts_dir).collect(
+        policy=policy,
+        subreddits=seeds,
+        sort=sort,
+    )
+
+    within_run_items = deduplicate_items(collection.items)
+    repository = SQLiteResearchRepository(database)
+    repository.initialize()
+    deduplication = filter_cross_run_duplicates(database, within_run_items)
+    items = list(deduplication.items)
+    signals = detect_pain_signals(items)
+    clusters = build_opportunity_clusters(items, signals)
+
+    run = repository.create_run(name, status="processing")
+    repository.save_source_items(run.run_id, items)
+    repository.save_pain_signals(run.run_id, signals)
+    repository.save_clusters(run.run_id, clusters)
+    repository.set_run_status(run.run_id, "completed")
+
+    write_opportunity_report(output, items=items, clusters=clusters)
+    result = {
+        "run_id": run.run_id,
+        "name": run.name,
+        "status": "completed",
+        "database": str(database),
+        "report": str(output),
+        "subreddits": seeds,
+        "sort": sort,
+        "stop_reason": collection.stop_reason or "completed",
+        "items_collected_raw": len(collection.items),
+        "within_run_unique_items": len(within_run_items),
+        "cross_run_external_id_duplicates": deduplication.excluded_external_ids,
+        "cross_run_content_duplicates": deduplication.excluded_content_hashes,
+        "source_items": len(items),
+        "pain_signals": len(signals),
+        "clusters": len(clusters),
+        "evidence": [
+            evidence.model_dump(mode="json")
+            for evidence in collection.evidence
+        ],
+    }
+    if json_output is not None:
+        json_output.parent.mkdir(parents=True, exist_ok=True)
+        json_output.write_text(json.dumps(result, indent=2), encoding="utf-8")
+
+    typer.echo(
+        f"PASS: stored live run {run.run_id} with {len(items)} new source item(s), "
+        f"excluded {deduplication.excluded_external_ids} repeated ID(s) and "
+        f"{deduplication.excluded_content_hashes} repeated content item(s), "
+        f"stop_reason={result['stop_reason']}"
     )
     typer.echo(f"Database: {database}")
     typer.echo(f"Report: {output}")
