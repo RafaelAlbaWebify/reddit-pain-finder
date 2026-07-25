@@ -125,3 +125,38 @@ def test_generic_neutral_text_can_abstain() -> None:
     )
 
     assert generate_candidate_signals([item]) == []
+
+def test_context_generator_covers_capacity_and_stalled_outcomes() -> None:
+    capacity = _item(
+        "context-capacity",
+        body="We are buried in manual work and cannot keep up with the backlog.",
+    )
+    stalled = _item(
+        "context-stalled",
+        body="We have no traction and the needle does not move.",
+    )
+
+    capacity_signals = generate_candidate_signals([capacity])
+    stalled_signals = generate_candidate_signals([stalled])
+
+    assert any(
+        signal.signal_type is SignalType.CAPACITY_PRESSURE
+        for signal in capacity_signals
+    )
+    assert any(
+        signal.signal_type is SignalType.STALLED_OUTCOME
+        for signal in stalled_signals
+    )
+
+
+def test_context_generator_covers_operational_and_financial_risk() -> None:
+    item = _item(
+        "context-risk",
+        body="Our account was closed permanently and the payouts were held.",
+    )
+
+    signals = generate_candidate_signals([item])
+    signal_types = {signal.signal_type for signal in signals}
+
+    assert SignalType.OPERATIONAL_RISK in signal_types
+    assert SignalType.FINANCIAL_LOSS in signal_types
