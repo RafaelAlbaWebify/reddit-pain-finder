@@ -6,11 +6,11 @@ from pydantic import ValidationError
 from painfinder.domain import EvidenceField, EvidenceSpan, PainCategory, SignalType
 from painfinder.pain_assessment import AssessmentVerdict, PainAssessment
 from painfinder.pain_policy import (
+    apply_pain_policy,
     FinalPolicyDecision,
     PainPolicy,
     PainPolicyInput,
     PolicyReason,
-    apply_pain_policy,
 )
 from painfinder.pain_verification import (
     PainVerification,
@@ -197,7 +197,9 @@ def test_policy_thresholds_are_configurable() -> None:
 
 
 def test_policy_input_rejects_mismatched_source_ids() -> None:
-    verification = _verification().model_copy(update={"source_external_id": "two"})
+    verification = _verification().model_copy(
+        update={"source_external_id": "two"}
+    )
 
     with pytest.raises(ValidationError, match="different source items"):
         PainPolicyInput(
