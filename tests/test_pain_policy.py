@@ -3,14 +3,19 @@ from __future__ import annotations
 import pytest
 from pydantic import ValidationError
 
-from painfinder.domain import EvidenceField, EvidenceSpan, PainCategory, SignalType
+from painfinder.domain import (
+    EvidenceField,
+    EvidenceSpan,
+    PainCategory,
+    SignalType,
+)
 from painfinder.pain_assessment import AssessmentVerdict, PainAssessment
 from painfinder.pain_policy import (
-    apply_pain_policy,
     FinalPolicyDecision,
     PainPolicy,
     PainPolicyInput,
     PolicyReason,
+    apply_pain_policy,
 )
 from painfinder.pain_verification import (
     PainVerification,
