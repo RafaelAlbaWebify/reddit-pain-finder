@@ -1,7 +1,6 @@
 from __future__ import annotations
 
 import urllib.parse
-from typing import TypeVar
 
 from pydantic import BaseModel, ValidationError
 
@@ -15,14 +14,11 @@ from painfinder.ai_review_http import (
 )
 
 
-StructuredModel = TypeVar("StructuredModel", bound=BaseModel)
-
-
 class StructuredAIHTTPError(RuntimeError):
     pass
 
 
-def complete_structured(
+def complete_structured[StructuredModel: BaseModel](
     profile: ReviewerProfile,
     *,
     schema_name: str,
