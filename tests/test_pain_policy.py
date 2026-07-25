@@ -23,7 +23,6 @@ from painfinder.pain_verification import (
     VerificationVerdict,
 )
 
-
 SPAN = EvidenceSpan(
     field=EvidenceField.BODY,
     start=0,
