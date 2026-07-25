@@ -47,6 +47,11 @@ class SignalType(StrEnum):
     RISK_OR_FEAR = "risk_or_fear"
     DISSATISFACTION = "dissatisfaction"
     ALTERNATIVE_SEARCH = "alternative_search"
+    CAPACITY_PRESSURE = "capacity_pressure"
+    STALLED_OUTCOME = "stalled_outcome"
+    OPERATIONAL_RISK = "operational_risk"
+    FINANCIAL_LOSS = "financial_loss"
+    DECISION_FRICTION = "decision_friction"
 
 
 class EvidenceSpan(BaseModel):

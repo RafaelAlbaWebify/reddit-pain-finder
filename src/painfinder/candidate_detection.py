@@ -289,6 +289,87 @@ CONFLICT_GENERATOR = RegexCandidateGenerator(
     ),
 )
 
+
+CONTEXT_GENERATOR = RegexCandidateGenerator(
+    detector_id="contextual-pain-language",
+    detector_version="1",
+    patterns=(
+        CandidatePattern(
+            SignalType.CAPACITY_PRESSURE,
+            re.compile(
+                r"\b(?:too much work|can(?:not|'t|’t) keep up|"
+                r"overwhelmed|overloaded|buried in|no bandwidth|"
+                r"short[- ]staffed|understaffed|backlog|bottleneck|"
+                r"taking too long|time[- ]consuming|manual process|"
+                r"doing .* by hand|spending hours|quiet weeks?|quiet years?)\b",
+                re.I,
+            ),
+            "capacity, workload, delay, or manual-effort pressure",
+            0.64,
+        ),
+        CandidatePattern(
+            SignalType.STALLED_OUTCOME,
+            re.compile(
+                r"\b(?:no traction|low traction|needle (?:doesn['’]?t|does not) move|"
+                r"not getting results|gets? (?:me|us|you) nowhere|"
+                r"falling below|missing (?:the )?(?:target|quota|goal)|"
+                r"not enough (?:leads|sales|users|customers|time|capacity)|"
+                r"zero decision making ability|lack of trust|"
+                r"low motivation|don['’]?t really care|"
+                r"don['’]?t really like (?:their|my|our) jobs?|"
+                r"can['’]?t seem to|unable to make progress)\b",
+                re.I,
+            ),
+            "stalled progress, weak outcomes, or organizational constraint",
+            0.67,
+        ),
+        CandidatePattern(
+            SignalType.OPERATIONAL_RISK,
+            re.compile(
+                r"\b(?:account (?:is |was )?closed|closed permanently|"
+                r"payments? switched off|payouts? held|funds? held|"
+                r"at risk|risk report|red line|high level of risk|"
+                r"pip|termination|churn|lost client|lose the client|"
+                r"dispute rate|appeal (?:denied|rejected)|"
+                r"blocked from|locked out|shutdown)\b",
+                re.I,
+            ),
+            "operational, employment, retention, or account-access risk",
+            0.76,
+        ),
+        CandidatePattern(
+            SignalType.FINANCIAL_LOSS,
+            re.compile(
+                r"\b(?:unpaid|late payment|payment overdue|"
+                r"lost revenue|losing revenue|lost money|losing money|"
+                r"cash flow|cashflow|margin (?:is |was )?(?:thin|shrinking)|"
+                r"refunds?|chargebacks?|"
+                r"payouts? (?:are |were |is |was )?held|"
+                r"funds? (?:are |were |is |was )?held|"
+                r"price objection|budget cut|budget cuts|"
+                r"can['’]?t justify the cost|costs? too much)\b",
+                re.I,
+            ),
+            "direct financial loss, delayed payment, or budget pressure",
+            0.72,
+        ),
+        CandidatePattern(
+            SignalType.DECISION_FRICTION,
+            re.compile(
+                r"\b(?:how wrong am i|would you agree|are my instincts correct|"
+                r"does .* actually (?:help|work|matter|make any difference)|"
+                r"is it worth|worth doing|not sure whether|"
+                r"which approach|what would you do|"
+                r"need to decide|hard to decide|difficult to choose)\b",
+                re.I,
+            ),
+            "uncertainty or friction around a consequential decision",
+            0.58,
+        ),
+    ),
+)
+
+
 DEFAULT_GENERATORS: tuple[CandidateGenerator, ...] = cast(
     tuple[CandidateGenerator, ...],
     (
@@ -299,6 +380,7 @@ DEFAULT_GENERATORS: tuple[CandidateGenerator, ...] = cast(
         COST_GENERATOR,
         WORKAROUND_GENERATOR,
         CONFLICT_GENERATOR,
+        CONTEXT_GENERATOR,
     ),
 )
 
