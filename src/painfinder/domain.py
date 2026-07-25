@@ -23,6 +23,58 @@ class PainCategory(StrEnum):
     EXPLICIT_DEMAND = "explicit_demand"
 
 
+class EvidenceField(StrEnum):
+    TITLE = "title"
+    BODY = "body"
+
+
+class SignalType(StrEnum):
+    EXPLICIT_PROBLEM = "explicit_problem"
+    ADVICE_REQUEST = "advice_request"
+    SOLUTION_REQUEST = "solution_request"
+    RECOMMENDATION_REQUEST = "recommendation_request"
+    FAILURE_NARRATIVE = "failure_narrative"
+    UNMET_OUTCOME = "unmet_outcome"
+    MANUAL_WORK = "manual_work"
+    WORKAROUND = "workaround"
+    COST_PRESSURE = "cost_pressure"
+    MONEY_SIGNAL = "money_signal"
+    UNCERTAINTY = "uncertainty"
+    CONFLICT = "conflict"
+    ACCESS_BARRIER = "access_barrier"
+    MISSING_CAPABILITY = "missing_capability"
+    POOR_SUPPORT = "poor_support"
+    RISK_OR_FEAR = "risk_or_fear"
+    DISSATISFACTION = "dissatisfaction"
+    ALTERNATIVE_SEARCH = "alternative_search"
+
+
+class EvidenceSpan(BaseModel):
+    field: EvidenceField
+    start: int = Field(ge=0)
+    end: int = Field(gt=0)
+    text: str = Field(min_length=1)
+
+    @model_validator(mode="after")
+    def validate_bounds(self) -> EvidenceSpan:
+        if self.end <= self.start:
+            raise ValueError("Evidence span end must be greater than start")
+        if len(self.text) != self.end - self.start:
+            raise ValueError("Evidence span offsets must match text length")
+        return self
+
+
+class CandidateSignal(BaseModel):
+    source_external_id: str = Field(min_length=1)
+    signal_type: SignalType
+    detector_id: str = Field(min_length=1)
+    detector_version: str = Field(min_length=1)
+    strength: float = Field(ge=0, le=1)
+    evidence_spans: tuple[EvidenceSpan, ...] = Field(min_length=1)
+    reason: str = Field(min_length=1)
+    metadata: dict[str, str] = Field(default_factory=dict)
+
+
 class ResearchRun(BaseModel):
     name: str = Field(min_length=1)
     max_pages: int = Field(default=25, ge=1, le=500)

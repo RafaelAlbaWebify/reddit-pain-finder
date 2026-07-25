@@ -1,0 +1,108 @@
+{
+  "dataset_version": "reddit-expanded-calibration-v1",
+  "source_file": "calibration-blind.csv",
+  "case_count": 140,
+  "resolved_count": 140,
+  "positive_count": 57,
+  "negative_count": 83,
+  "positive_rate": 0.407143,
+  "reviewer": "GPT-5.6 Thinking (AI adjudication)",
+  "reviewed_at": "2026-07-25",
+  "policy_validation_touched": false,
+  "category_counts": {
+    "cost": 22,
+    "explicit_demand": 31,
+    "manual_work": 10,
+    "reliability": 45,
+    "workaround": 6
+  },
+  "cluster_count": 55,
+  "most_common_clusters": [
+    {
+      "cluster": "soc2-sales-blocker",
+      "count": 2
+    },
+    {
+      "cluster": "customer-health-score-ownership",
+      "count": 2
+    },
+    {
+      "cluster": "low-capacity-workday",
+      "count": 1
+    },
+    {
+      "cluster": "marketing-role-burnout",
+      "count": 1
+    },
+    {
+      "cluster": "product-management-capacity",
+      "count": 1
+    },
+    {
+      "cluster": "linkedin-recruiter-visibility",
+      "count": 1
+    },
+    {
+      "cluster": "marketing-role-autonomy",
+      "count": 1
+    },
+    {
+      "cluster": "payment-processor-account-shutdown",
+      "count": 1
+    },
+    {
+      "cluster": "customer-health-scoring",
+      "count": 1
+    },
+    {
+      "cluster": "cold-start-user-acquisition",
+      "count": 1
+    },
+    {
+      "cluster": "linkedin-saas-marketing",
+      "count": 1
+    },
+    {
+      "cluster": "customer-call-routing",
+      "count": 1
+    },
+    {
+      "cluster": "seasonal-sales-pipeline",
+      "count": 1
+    },
+    {
+      "cluster": "freelance-revision-dispute",
+      "count": 1
+    },
+    {
+      "cluster": "hidden-process-bottlenecks",
+      "count": 1
+    }
+  ],
+  "community_counts": {
+    "Accounting": 4,
+    "CustomerSuccess": 7,
+    "Entrepreneur": 8,
+    "ProductManagement": 9,
+    "SaaS": 7,
+    "consulting": 12,
+    "ecommerce": 7,
+    "freelance": 11,
+    "legaltech": 7,
+    "marketing": 11,
+    "msp": 10,
+    "sales": 16,
+    "smallbusiness": 9,
+    "startups": 11,
+    "sysadmin": 6,
+    "webdev": 5
+  },
+  "validation_checks": {
+    "exactly_140_cases": true,
+    "unique_external_ids": true,
+    "all_rows_resolved": true,
+    "positive_rows_complete": true,
+    "negative_rows_clean": true
+  },
+  "method_note": "All 140 calibration cases, including borderline cases, were directly adjudicated from the supplied title and body. No case was left unresolved. This is an AI-adjudicated calibration corpus, not an independently human-verified gold standard."
+}
