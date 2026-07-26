@@ -25,7 +25,10 @@ class _UnusedVerifier:
         raise AssertionError("neutral candidate miss must not call verifier")
 
 
-def _profile(name: str, endpoint: str = "http://127.0.0.1:11434/v1/chat/completions") -> dict[str, object]:
+def _profile(
+    name: str,
+    endpoint: str = "http://127.0.0.1:11434/v1/chat/completions",
+) -> dict[str, object]:
     return {
         "name": name,
         "endpoint": endpoint,
@@ -60,7 +63,12 @@ def test_command_runs_without_live_http_for_candidate_miss(tmp_path: Path) -> No
     )
     config = tmp_path / "calibration-config.json"
     config.write_text(
-        json.dumps({"assessor": _profile("assessor"), "verifier": _profile("verifier")}),
+        json.dumps(
+            {
+                "assessor": _profile("assessor"),
+                "verifier": _profile("verifier"),
+            }
+        ),
         encoding="utf-8",
     )
     attempts = tmp_path / "attempts.jsonl"
@@ -88,7 +96,10 @@ def test_non_loopback_profiles_require_api_key_environment(tmp_path: Path) -> No
     config.write_text(
         json.dumps(
             {
-                "assessor": _profile("assessor", "https://api.example.com/v1/chat/completions"),
+                "assessor": _profile(
+                    "assessor",
+                    "https://api.example.com/v1/chat/completions",
+                ),
                 "verifier": _profile("verifier"),
             }
         ),
@@ -102,7 +113,12 @@ def test_non_loopback_profiles_require_api_key_environment(tmp_path: Path) -> No
 def test_configuration_preserves_separate_role_profiles(tmp_path: Path) -> None:
     config = tmp_path / "calibration-config.json"
     config.write_text(
-        json.dumps({"assessor": _profile("assessor"), "verifier": _profile("verifier")}),
+        json.dumps(
+            {
+                "assessor": _profile("assessor"),
+                "verifier": _profile("verifier"),
+            }
+        ),
         encoding="utf-8",
     )
 
