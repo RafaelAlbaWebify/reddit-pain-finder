@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import urllib.error
 import urllib.parse
 
 from pydantic import BaseModel, ValidationError
@@ -52,9 +53,26 @@ def complete_structured[StructuredModel: BaseModel](
             completion.choices[0].message.content
         )
     except (AIReviewRunnerError, ValidationError, ValueError) as error:
+        detail = _http_error_detail(error)
+        suffix = f"; server response: {detail}" if detail else ""
         raise StructuredAIHTTPError(
-            f"Structured model {profile.name} returned an invalid response: {error}"
+            f"Structured model {profile.name} returned an invalid response: {error}{suffix}"
         ) from error
+
+
+def _http_error_detail(error: BaseException) -> str | None:
+    cause: BaseException | None = error
+    while cause is not None:
+        if isinstance(cause, urllib.error.HTTPError):
+            try:
+                body = cause.read().decode("utf-8", errors="replace").strip()
+            except OSError:
+                return None
+            if not body:
+                return None
+            return body[:2000]
+        cause = cause.__cause__
+    return None
 
 
 def _validate_remote_credentials(profile: ReviewerProfile) -> None:
