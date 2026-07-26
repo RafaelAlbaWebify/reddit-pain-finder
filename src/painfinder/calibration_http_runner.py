@@ -57,6 +57,7 @@ def run_http_calibration(
     *,
     attempts_output: Path,
     metrics_output: Path,
+    only_id: str | None = None,
     assessor_factory: AssessorFactory = HTTPPainAssessor,
     verifier_factory: VerifierFactory = HTTPPainVerifier,
 ) -> CalibrationMetrics:
@@ -64,6 +65,11 @@ def run_http_calibration(
         cases = load_benchmark(corpus)
     except BenchmarkFormatError as error:
         raise CalibrationRunnerError(f"Invalid calibration corpus: {error}") from error
+
+    if only_id is not None:
+        cases = [case for case in cases if case.item.external_id == only_id]
+        if not cases:
+            raise CalibrationRunnerError(f"Calibration case not found: {only_id}")
 
     config = load_calibration_http_config(config_path)
     metrics = run_calibration(
@@ -83,6 +89,10 @@ def main() -> int:
     parser.add_argument("--corpus", type=Path, required=True)
     parser.add_argument("--config", type=Path, required=True)
     parser.add_argument(
+        "--only-id",
+        help="Run exactly one corpus case by external ID for transport smoke testing.",
+    )
+    parser.add_argument(
         "--attempts-output",
         type=Path,
         default=Path("output/calibration-attempts.jsonl"),
@@ -100,6 +110,7 @@ def main() -> int:
             arguments.config,
             attempts_output=arguments.attempts_output,
             metrics_output=arguments.metrics_output,
+            only_id=arguments.only_id,
         )
     except CalibrationRunnerError as error:
         print(f"ERROR: {error}")

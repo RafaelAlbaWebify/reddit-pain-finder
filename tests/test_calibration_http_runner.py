@@ -40,29 +40,24 @@ def _profile(
     }
 
 
-def test_command_runs_without_live_http_for_candidate_miss(tmp_path: Path) -> None:
-    corpus = tmp_path / "calibration.jsonl"
-    corpus.write_text(
-        json.dumps(
-            {
-                "item": {
-                    "external_id": "neutral-1",
-                    "source_type": "post",
-                    "title": "",
-                    "body": "Thanks for sharing.",
-                    "subreddit": "smallbusiness",
-                    "canonical_url": "https://reddit.com/neutral-1",
-                },
-                "expected_pain": False,
-                "expected_categories": [],
-                "expected_cluster": None,
-            }
-        )
-        + "\n",
-        encoding="utf-8",
-    )
-    config = tmp_path / "calibration-config.json"
-    config.write_text(
+def _case(external_id: str) -> dict[str, object]:
+    return {
+        "item": {
+            "external_id": external_id,
+            "source_type": "post",
+            "title": "",
+            "body": "Thanks for sharing.",
+            "subreddit": "smallbusiness",
+            "canonical_url": f"https://reddit.com/{external_id}",
+        },
+        "expected_pain": False,
+        "expected_categories": [],
+        "expected_cluster": None,
+    }
+
+
+def _write_config(path: Path) -> None:
+    path.write_text(
         json.dumps(
             {
                 "assessor": _profile("assessor"),
@@ -71,6 +66,13 @@ def test_command_runs_without_live_http_for_candidate_miss(tmp_path: Path) -> No
         ),
         encoding="utf-8",
     )
+
+
+def test_command_runs_without_live_http_for_candidate_miss(tmp_path: Path) -> None:
+    corpus = tmp_path / "calibration.jsonl"
+    corpus.write_text(json.dumps(_case("neutral-1")) + "\n", encoding="utf-8")
+    config = tmp_path / "calibration-config.json"
+    _write_config(config)
     attempts = tmp_path / "attempts.jsonl"
     metrics_path = tmp_path / "metrics.json"
 
@@ -89,6 +91,51 @@ def test_command_runs_without_live_http_for_candidate_miss(tmp_path: Path) -> No
     assert metrics.resumed_count == 0
     assert attempts.exists()
     assert json.loads(metrics_path.read_text(encoding="utf-8"))["accuracy"] == 1.0
+
+
+def test_only_id_runs_exactly_one_matching_case(tmp_path: Path) -> None:
+    corpus = tmp_path / "calibration.jsonl"
+    corpus.write_text(
+        "\n".join(json.dumps(_case(case_id)) for case_id in ("neutral-1", "neutral-2"))
+        + "\n",
+        encoding="utf-8",
+    )
+    config = tmp_path / "calibration-config.json"
+    _write_config(config)
+    attempts = tmp_path / "smoke-attempts.jsonl"
+    metrics_path = tmp_path / "smoke-metrics.json"
+
+    metrics = run_http_calibration(
+        corpus,
+        config,
+        attempts_output=attempts,
+        metrics_output=metrics_path,
+        only_id="neutral-2",
+        assessor_factory=lambda profile: _UnusedAssessor(),
+        verifier_factory=lambda profile: _UnusedVerifier(),
+    )
+
+    assert metrics.case_count == 1
+    record = json.loads(attempts.read_text(encoding="utf-8"))
+    assert record["source_external_id"] == "neutral-2"
+
+
+def test_only_id_rejects_unknown_case(tmp_path: Path) -> None:
+    corpus = tmp_path / "calibration.jsonl"
+    corpus.write_text(json.dumps(_case("neutral-1")) + "\n", encoding="utf-8")
+    config = tmp_path / "calibration-config.json"
+    _write_config(config)
+
+    with pytest.raises(CalibrationRunnerError, match="Calibration case not found: missing"):
+        run_http_calibration(
+            corpus,
+            config,
+            attempts_output=tmp_path / "attempts.jsonl",
+            metrics_output=tmp_path / "metrics.json",
+            only_id="missing",
+            assessor_factory=lambda profile: _UnusedAssessor(),
+            verifier_factory=lambda profile: _UnusedVerifier(),
+        )
 
 
 def test_non_loopback_profiles_require_api_key_environment(tmp_path: Path) -> None:
@@ -112,15 +159,7 @@ def test_non_loopback_profiles_require_api_key_environment(tmp_path: Path) -> No
 
 def test_configuration_preserves_separate_role_profiles(tmp_path: Path) -> None:
     config = tmp_path / "calibration-config.json"
-    config.write_text(
-        json.dumps(
-            {
-                "assessor": _profile("assessor"),
-                "verifier": _profile("verifier"),
-            }
-        ),
-        encoding="utf-8",
-    )
+    _write_config(config)
 
     loaded = load_calibration_http_config(config)
 
