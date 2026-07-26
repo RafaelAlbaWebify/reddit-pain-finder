@@ -6,6 +6,7 @@ from pathlib import Path
 from painfinder.benchmark import BenchmarkCase
 from painfinder.calibration_runner import (
     CalibrationRecord,
+    CalibrationStage,
     load_latest_records,
     run_calibration,
     write_calibration_metrics,
@@ -104,9 +105,22 @@ def test_runner_records_candidate_misses_and_pipeline_outcomes(
     assert records["pain"].decision is FinalPolicyDecision.ACCEPT
     assert records["neutral"].decision is FinalPolicyDecision.REJECT
     assert records["neutral"].candidate_count == 0
+    assert records["pain"].subreddit == "smallbusiness"
     assert metrics.true_positive == 1
     assert metrics.true_negative == 1
     assert metrics.accuracy == 1.0
+    assert metrics.attempted_count == 2
+    assert metrics.resumed_count == 0
+    assert metrics.assessor_verdict_counts == {"not_run": 1, "pain": 1}
+    assert metrics.verifier_verdict_counts == {"confirm": 1, "not_run": 1}
+    assert metrics.policy_reason_counts == {
+        "candidate_miss": 1,
+        "verifier_confirmed": 1,
+    }
+    assert metrics.expected_category_counts == {"reliability": 1}
+    assert metrics.assessed_category_counts == {"reliability": 1}
+    assert metrics.subreddit_counts == {"smallbusiness": 2}
+    assert not output.with_name(".attempts.jsonl.tmp").exists()
 
 
 def test_runner_resumes_successful_records_without_model_calls(
@@ -117,7 +131,7 @@ def test_runner_resumes_successful_records_without_model_calls(
     first_assessor = _Assessor()
     first_verifier = _Verifier()
 
-    run_calibration(
+    first = run_calibration(
         cases,
         first_assessor,
         first_verifier,
@@ -125,7 +139,7 @@ def test_runner_resumes_successful_records_without_model_calls(
     )
     second_assessor = _Assessor()
     second_verifier = _Verifier()
-    run_calibration(
+    second = run_calibration(
         cases,
         second_assessor,
         second_verifier,
@@ -135,10 +149,13 @@ def test_runner_resumes_successful_records_without_model_calls(
     assert first_assessor.calls == ["pain"]
     assert second_assessor.calls == []
     assert second_verifier.calls == []
+    assert first.attempted_count == 1
+    assert second.attempted_count == 0
+    assert second.resumed_count == 1
     assert len(output.read_text(encoding="utf-8").splitlines()) == 1
 
 
-def test_runner_preserves_error_and_retries_it(tmp_path: Path) -> None:
+def test_runner_preserves_structured_error_and_retries_it(tmp_path: Path) -> None:
     cases = [_case("pain", "We are overwhelmed by the backlog.", True)]
     output = tmp_path / "attempts.jsonl"
 
@@ -152,6 +169,7 @@ def test_runner_preserves_error_and_retries_it(tmp_path: Path) -> None:
         _Verifier(),
         output_path=output,
     )
+    failed_record = load_latest_records(output)["pain"]
     second = run_calibration(
         cases,
         _Assessor(),
@@ -161,29 +179,30 @@ def test_runner_preserves_error_and_retries_it(tmp_path: Path) -> None:
     records = load_latest_records(output)
 
     assert first.error_count == 1
+    assert first.failure_stage_counts == {"assessor": 1}
+    assert failed_record.failure is not None
+    assert failed_record.failure.stage is CalibrationStage.ASSESSOR
+    assert failed_record.failure.error_type == "RuntimeError"
+    assert failed_record.failure.message == "model unavailable"
     assert second.error_count == 0
     assert records["pain"].decision is FinalPolicyDecision.ACCEPT
     assert len(output.read_text(encoding="utf-8").splitlines()) == 2
 
 
-def test_latest_record_wins_and_metrics_are_written(tmp_path: Path) -> None:
+def test_latest_record_wins_and_metrics_are_written_atomically(
+    tmp_path: Path,
+) -> None:
     output = tmp_path / "attempts.jsonl"
-    failed = CalibrationRecord(
-        source_external_id="one",
-        expected_pain=True,
-        candidate_count=1,
-        error="RuntimeError: unavailable",
-    )
     completed = CalibrationRecord(
         source_external_id="one",
+        subreddit="smallbusiness",
         expected_pain=True,
+        expected_categories=(PainCategory.RELIABILITY,),
         candidate_count=0,
+        duration_ms=3,
         decision=FinalPolicyDecision.REJECT,
     )
-    output.write_text(
-        failed.model_dump_json() + "\n" + completed.model_dump_json() + "\n",
-        encoding="utf-8",
-    )
+    output.write_text(completed.model_dump_json() + "\n", encoding="utf-8")
 
     records = load_latest_records(output)
     metrics_path = tmp_path / "metrics.json"
@@ -199,3 +218,5 @@ def test_latest_record_wins_and_metrics_are_written(tmp_path: Path) -> None:
     assert records["one"].decision is FinalPolicyDecision.REJECT
     assert payload["false_negative"] == 1
     assert payload["decision_counts"] == {"reject": 1}
+    assert payload["completed_duration_ms"] == 3
+    assert not metrics_path.with_name(".metrics.json.tmp").exists()
