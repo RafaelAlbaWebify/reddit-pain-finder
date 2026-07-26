@@ -4,7 +4,7 @@ import argparse
 import json
 from pathlib import Path
 
-from pydantic import BaseModel, ValidationError
+from pydantic import BaseModel, Field, ValidationError
 
 from painfinder.ai_review_http import ReviewerProfile
 from painfinder.benchmark import load_benchmark
@@ -24,7 +24,7 @@ class CalibrationCLIError(RuntimeError):
 class CalibrationHTTPConfig(BaseModel):
     assessor: ReviewerProfile
     verifier: ReviewerProfile
-    policy: PainPolicy = PainPolicy()
+    policy: PainPolicy = Field(default_factory=PainPolicy)
 
 
 def load_calibration_config(path: Path) -> CalibrationHTTPConfig:
