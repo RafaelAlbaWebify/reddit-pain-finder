@@ -116,8 +116,9 @@ def main() -> int:
         print(f"ERROR: {error}")
         return 2
 
+    status = "DONE_WITH_ERRORS" if metrics.error_count else "PASS"
     print(
-        "PASS: "
+        f"{status}: "
         f"cases={metrics.case_count}, completed={metrics.completed_count}, "
         f"errors={metrics.error_count}, attempted={metrics.attempted_count}, "
         f"resumed={metrics.resumed_count}, precision={metrics.precision:.3f}, "
