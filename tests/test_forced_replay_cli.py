@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import json
 from pathlib import Path
 
 import pytest
@@ -40,8 +41,17 @@ def _record(external_id: str, candidate_count: int) -> CalibrationRecord:
 
 
 def _write_corpus(path: Path, cases: list[BenchmarkCase]) -> None:
+    payloads = (
+        {
+            "item": case.item.model_dump(mode="json"),
+            "expected_pain": case.expected_pain,
+            "expected_categories": [value.value for value in case.expected_categories],
+            "expected_cluster": case.expected_cluster,
+        }
+        for case in cases
+    )
     path.write_text(
-        "".join(case.model_dump_json() + "\n" for case in cases),
+        "".join(json.dumps(payload) + "\n" for payload in payloads),
         encoding="utf-8",
     )
 
