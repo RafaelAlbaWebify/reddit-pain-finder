@@ -117,6 +117,13 @@ def test_http_assessor_rebinds_trusted_id_and_uses_schema(
         "painfinder_pain_assessment"
     )
     assert payload["reasoning_effort"] == "none"
+    prompt = payload["messages"][1]["content"]
+    assert 'verdict="pain" requires at least one allowed category' in prompt
+    assert (
+        'verdict="not_pain" or verdict="abstain" requires categories=[]'
+        in prompt
+    )
+    assert 'Never return verdict="pain" with an empty categories array.' in prompt
 
 
 def test_http_verifier_rebinds_trusted_id_and_confirms_grounded_assessment(
