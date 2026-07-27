@@ -1,3 +1,5 @@
+# Ruff repeatedly emits a no-op I001 fix for this valid import block.
+# ruff: noqa: I001
 from __future__ import annotations
 
 from painfinder import pain_assessment
