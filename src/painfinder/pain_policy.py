@@ -30,7 +30,7 @@ class PolicyReason(StrEnum):
 class PainPolicy(BaseModel):
     minimum_pain_confidence: float = Field(default=0.8, ge=0.0, le=1.0)
     minimum_assessor_evidence_confidence: float = Field(
-        default=0.8,
+        default=0.7,
         ge=0.0,
         le=1.0,
     )
@@ -40,7 +40,7 @@ class PainPolicy(BaseModel):
         le=1.0,
     )
     minimum_verifier_evidence_confidence: float = Field(
-        default=0.8,
+        default=0.7,
         ge=0.0,
         le=1.0,
     )

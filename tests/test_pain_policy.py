@@ -147,7 +147,7 @@ def test_policy_routes_low_confidence_to_review() -> None:
         PainPolicyInput(
             assessment=_assessment(
                 pain_confidence=0.7,
-                evidence_confidence=0.75,
+                evidence_confidence=0.65,
             ),
             verification=_verification(
                 verification_confidence=0.6,
