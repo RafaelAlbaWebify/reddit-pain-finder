@@ -134,9 +134,9 @@ def _schema_repair_rules(model_name: str) -> str:
             "least one exact source span already present in the preceding JSON or source "
             "context. Preserve existing cited_signal_types and cited_evidence when they "
             "are already present.\n"
-            '- If you cannot provide every required grounded field without inventing '
-            'content, set verdict="abstain", categories=[], problem_statement="", '
-            'cited_signal_types=[], and cited_evidence=[].\n'
+            '- If you cannot provide every required grounded field, set verdict="abstain", '
+            'categories=[], problem_statement="", cited_signal_types=[], and '
+            "cited_evidence=[]. Do not invent content to avoid abstaining.\n"
             '- Never keep verdict="pain" while leaving categories, problem_statement, '
             "cited_signal_types, or cited_evidence empty. Never return verdict=\"pain\" "
             "with any required positive field empty. Do not fix one required field by "
