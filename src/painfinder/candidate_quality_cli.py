@@ -13,7 +13,10 @@ from painfinder.candidate_quality_report import (
 
 def main() -> int:
     parser = argparse.ArgumentParser(
-        description="Analyze candidate misses and the calibration decision funnel without model calls."
+        description=(
+            "Analyze candidate misses and the calibration decision funnel "
+            "without model calls."
+        )
     )
     parser.add_argument("--corpus", type=Path, required=True)
     parser.add_argument("--attempts", type=Path, required=True)
