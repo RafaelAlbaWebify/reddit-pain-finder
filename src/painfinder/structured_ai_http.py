@@ -134,17 +134,19 @@ def _schema_repair_rules(model_name: str) -> str:
             '- If you cannot provide every required grounded field, set verdict="abstain", '
             'categories=[], problem_statement="", cited_signal_types=[], and '
             "cited_evidence=[].\n"
-            '- Never keep verdict="pain" while leaving categories or problem_statement empty.'
+            '- Never keep verdict="pain" while leaving categories or problem_statement '
+            "empty."
         )
     if model_name == "PainVerification":
         return (
-            '- For verdict="confirm": confirmed_categories must contain at least one category '
-            "already present in the assessment, reasons must include supported_by_source, "
-            "and cited_evidence must contain exact source spans.\n"
+            '- For verdict="confirm": confirmed_categories must contain at least one '
+            "category already present in the assessment, reasons must include "
+            "supported_by_source, and cited_evidence must contain exact source spans.\n"
             '- If exact source evidence or a supported category is unavailable, set '
             'verdict="abstain", confirmed_categories=[], corrected_problem_statement="", '
             "and cited_evidence=[].\n"
-            '- Never keep verdict="confirm" while confirmed_categories or cited_evidence is empty.'
+            '- Never keep verdict="confirm" while confirmed_categories or cited_evidence '
+            "is empty."
         )
     return (
         "Satisfy every cross-field validator. If a positive verdict requires grounded fields "
