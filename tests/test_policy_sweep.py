@@ -2,10 +2,21 @@ from __future__ import annotations
 
 from painfinder.benchmark import BenchmarkCase
 from painfinder.calibration_runner import CalibrationRecord
-from painfinder.domain import EvidenceField, EvidenceSpan, PainCategory, SignalType, SourceItem, SourceType
+from painfinder.domain import (
+    EvidenceField,
+    EvidenceSpan,
+    PainCategory,
+    SignalType,
+    SourceItem,
+    SourceType,
+)
 from painfinder.pain_assessment import AssessmentVerdict, PainAssessment
 from painfinder.pain_policy import FinalPolicyDecision
-from painfinder.pain_verification import PainVerification, VerificationReason, VerificationVerdict
+from painfinder.pain_verification import (
+    PainVerification,
+    VerificationReason,
+    VerificationVerdict,
+)
 from painfinder.policy_sweep import analyze_policy_thresholds
 
 SPAN = EvidenceSpan(field=EvidenceField.BODY, start=0, end=12, text="We are stuck")
