@@ -1,11 +1,9 @@
+# Ruff repeatedly emits a no-op I001 fix for this valid import block.
+# ruff: noqa: I001
 from __future__ import annotations
 
+from painfinder import pain_verification
 from painfinder.ai_review_http import ReviewerProfile
-from painfinder.pain_verification import (
-    PainVerification,
-    PainVerificationRequest,
-    verification_prompt_payload,
-)
 from painfinder.structured_ai_http import complete_structured
 
 
@@ -33,15 +31,18 @@ class HTTPPainVerifier:
     def __init__(self, profile: ReviewerProfile) -> None:
         self.profile = profile
 
-    def verify(self, request: PainVerificationRequest) -> PainVerification:
+    def verify(
+        self,
+        request: pain_verification.PainVerificationRequest,
+    ) -> pain_verification.PainVerification:
         prompt = (
             f"{_VERIFICATION_OUTPUT_CONTRACT}\n\n"
-            f"{verification_prompt_payload(request)}"
+            f"{pain_verification.verification_prompt_payload(request)}"
         )
         verification = complete_structured(
             self.profile,
             schema_name="painfinder_pain_verification",
-            response_model=PainVerification,
+            response_model=pain_verification.PainVerification,
             user_prompt=prompt,
         )
         return verification.model_copy(
