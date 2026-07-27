@@ -1,5 +1,7 @@
 from pathlib import Path
 
+import pytest
+
 from painfinder.candidate_audit import CandidateAuditRow
 from painfinder.candidate_audit_review import (
     AuditReviewDecision,
@@ -31,7 +33,7 @@ def _audit(source_id: str, error_type: str) -> CandidateAuditRow:
 
 
 def test_final_validation_passes_on_recovery_without_new_false_positives(
-    monkeypatch: object,
+    monkeypatch: pytest.MonkeyPatch,
     tmp_path: Path,
 ) -> None:
     baseline_gap = CandidateAuditReviewRow(
@@ -70,7 +72,7 @@ def test_final_validation_passes_on_recovery_without_new_false_positives(
 
 
 def test_final_validation_fails_when_a_new_false_positive_appears(
-    monkeypatch: object,
+    monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     baseline_gap = CandidateAuditReviewRow(
         audit=_audit("gap-recovered", "false_negative"),
