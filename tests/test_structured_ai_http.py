@@ -160,16 +160,29 @@ def test_http_verifier_rebinds_trusted_id_and_confirms_grounded_assessment(
         rationale="The source supports the assessment.",
         cited_evidence=signal.evidence_spans,
     )
+    captured: list[Any] = []
+
+    def fake_urlopen(http_request: Any, timeout: float) -> _Response:
+        captured.append(http_request)
+        return _Response(_completion(response))
 
     monkeypatch.setattr(
         "painfinder.ai_review_http.urllib.request.urlopen",
-        lambda request, timeout: _Response(_completion(response)),
+        fake_urlopen,
     )
 
     result = run_verifications((request,), HTTPPainVerifier(_profile()))
 
     assert result[0].source_external_id == "one"
     assert result[0].verdict is VerificationVerdict.CONFIRM
+    payload = json.loads(captured[0].data.decode("utf-8"))
+    prompt = payload["messages"][1]["content"]
+    assert 'verdict="confirm" requires at least one confirmed category' in prompt
+    assert (
+        'verdict="reject" or verdict="abstain" requires '
+        "confirmed_categories=[]" in prompt
+    )
+    assert 'verdict="reject" must not include reason="supported_by_source"' in prompt
 
 
 def test_remote_structured_profile_requires_api_key_setting() -> None:
