@@ -3,6 +3,8 @@ from __future__ import annotations
 import json
 from typing import Any
 
+import pytest
+
 from painfinder.ai_review_http import ReviewerProfile
 from painfinder.candidate_detection import generate_candidate_signals
 from painfinder.domain import SourceItem, SourceType
@@ -28,7 +30,9 @@ class _Response:
         return json.dumps(self.payload).encode("utf-8")
 
 
-def test_http_assessor_prompt_states_cross_field_contract(monkeypatch: Any) -> None:
+def test_http_assessor_prompt_states_cross_field_contract(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
     item = SourceItem(
         external_id="one",
         source_type=SourceType.POST,
@@ -77,5 +81,8 @@ def test_http_assessor_prompt_states_cross_field_contract(monkeypatch: Any) -> N
     payload = json.loads(captured[0].data.decode("utf-8"))
     prompt = payload["messages"][1]["content"]
     assert 'verdict="pain" requires at least one allowed category' in prompt
-    assert 'verdict="not_pain" or verdict="abstain" requires categories=[]' in prompt
+    assert (
+        'verdict="not_pain" or verdict="abstain" requires categories=[]'
+        in prompt
+    )
     assert 'Never return verdict="pain" with an empty categories array.' in prompt
