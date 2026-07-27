@@ -55,7 +55,7 @@ def complete_structured[StructuredModel: BaseModel](
                 {"role": "assistant", "content": content},
                 {
                     "role": "user",
-                    "content": _repair_prompt(initial_error),
+                    "content": _repair_prompt(response_model, initial_error),
                 },
             ],
         )
@@ -106,13 +106,52 @@ def _completion_content(
     return completion.choices[0].message.content
 
 
-def _repair_prompt(error: ValidationError) -> str:
+def _repair_prompt(
+    response_model: type[BaseModel],
+    error: ValidationError,
+) -> str:
+    model_name = response_model.__name__
+    model_rules = _schema_repair_rules(model_name)
     return (
-        "Repair the preceding JSON so it satisfies the same schema and all "
-        "cross-field validation rules. Change only fields required to resolve "
-        "the validation error. Do not add unsupported facts or evidence. Return "
-        "exactly one corrected JSON object and no commentary. Validation error:\n"
+        "Repair the preceding JSON object. Return exactly one corrected JSON object "
+        "and no commentary. Preserve every already valid grounded field. Change only "
+        "fields required to satisfy the validation error. Do not invent facts, source "
+        "quotes, evidence spans, categories, or conclusions. If the source does not "
+        "support the current positive verdict, change the verdict to the permitted "
+        "non-positive alternative and clear all positive-only fields.\n\n"
+        f"Schema-specific rules for {model_name}:\n{model_rules}\n\n"
+        "Validation error to fix:\n"
         f"{error}"
+    )
+
+
+def _schema_repair_rules(model_name: str) -> str:
+    if model_name == "PainAssessment":
+        return (
+            '- For verdict="pain": categories must contain at least one allowed category, '
+            "problem_statement must be a non-empty grounded summary, and cited_evidence "
+            "must contain only exact spans already supported by the source.\n"
+            '- If you cannot provide every required grounded field, set verdict="abstain", '
+            'categories=[], problem_statement="", cited_signal_types=[], and '
+            "cited_evidence=[].\n"
+            '- Never keep verdict="pain" while leaving categories or problem_statement '
+            "empty."
+        )
+    if model_name == "PainVerification":
+        return (
+            '- For verdict="confirm": confirmed_categories must contain at least one '
+            "category already present in the assessment, reasons must include "
+            "supported_by_source, and cited_evidence must contain exact source spans.\n"
+            '- If exact source evidence or a supported category is unavailable, set '
+            'verdict="abstain", confirmed_categories=[], corrected_problem_statement="", '
+            "and cited_evidence=[].\n"
+            '- Never keep verdict="confirm" while confirmed_categories or cited_evidence '
+            "is empty."
+        )
+    return (
+        "Satisfy every cross-field validator. If a positive verdict requires grounded fields "
+        "that cannot be supplied from existing source content, use the schema's abstain-style "
+        "verdict and clear positive-only fields."
     )
 
 
