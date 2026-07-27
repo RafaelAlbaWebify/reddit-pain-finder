@@ -3,9 +3,9 @@ from __future__ import annotations
 import json
 from pathlib import Path
 
-from pydantic import BaseModel
 from painfinder.browser_models import BrowserEvidence
 from painfinder.domain import SourceItem
+from pydantic import BaseModel
 
 
 OBSTRUCTION_REASONS = {
