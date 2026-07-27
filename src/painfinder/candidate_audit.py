@@ -61,7 +61,7 @@ def build_candidate_error_audit(
                 source_type=case.item.source_type.value,
                 title=case.item.title,
                 body=case.item.body,
-                canonical_url=case.item.canonical_url,
+                canonical_url=str(case.item.canonical_url),
                 detector_ids=tuple(
                     sorted({signal.detector_id for signal in case_signals})
                 ),
