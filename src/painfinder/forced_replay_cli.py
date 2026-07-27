@@ -3,19 +3,32 @@ from __future__ import annotations
 import argparse
 import os
 import tempfile
-from collections.abc import Callable, Sequence
+from collections.abc import Sequence
 from pathlib import Path
+from typing import Protocol
 
 from painfinder.benchmark import BenchmarkFormatError, load_benchmark
-from painfinder.calibration_http_runner import CalibrationMetrics, run_http_calibration
+from painfinder.calibration_http_runner import run_http_calibration
 from painfinder.calibration_runner import (
+    CalibrationMetrics,
     CalibrationRecord,
     evaluate_calibration,
     load_latest_records,
     write_calibration_metrics,
 )
 
-ReplayRunner = Callable[..., CalibrationMetrics]
+
+class ReplayRunner(Protocol):
+    def __call__(
+        self,
+        corpus: Path,
+        config_path: Path,
+        *,
+        attempts_output: Path,
+        metrics_output: Path,
+        only_id: str | None = None,
+    ) -> CalibrationMetrics:
+        ...
 
 
 class ForcedReplayError(RuntimeError):
