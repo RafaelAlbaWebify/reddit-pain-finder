@@ -2,9 +2,9 @@ from __future__ import annotations
 
 from painfinder.ai_review_http import ReviewerProfile
 from painfinder.pain_assessment import (
+    assessment_prompt_payload,
     PainAssessment,
     PainAssessmentRequest,
-    assessment_prompt_payload,
 )
 from painfinder.structured_ai_http import complete_structured
 
