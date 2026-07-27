@@ -251,12 +251,25 @@ def _counter_rows(values: dict[str, int]) -> str:
 def _surface_cues(title: str, body: str) -> tuple[str, ...]:
     text = f"{title}\n{body}".lower()
     patterns = {
-        "question": r"\?|\b(?:how|what|why|which|where|who|does|do|is|are|can|should)\b",
-        "first_person_difficulty": r"\b(?:i|we)\b.{0,40}\b(?:can't|cannot|struggl|stuck|unable|hard|difficult)\b",
-        "negative_outcome": r"\b(?:lost|losing|failed|failure|worse|slow|late|blocked|broken|problem)\b",
-        "financial": r"\b(?:cost|price|budget|money|revenue|payment|expensive|afford)\b",
-        "manual_or_time": r"\b(?:manual|spreadsheet|hours|time[- ]consuming|repetitive|by hand)\b",
-        "request_or_search": r"\b(?:need|looking for|recommend|advice|solution|alternative)\b",
+        "question": (
+            r"\?|\b(?:how|what|why|which|where|who|does|do|is|are|can|should)\b"
+        ),
+        "first_person_difficulty": (
+            r"\b(?:i|we)\b.{0,40}"
+            r"\b(?:can't|cannot|struggl|stuck|unable|hard|difficult)\b"
+        ),
+        "negative_outcome": (
+            r"\b(?:lost|losing|failed|failure|worse|slow|late|blocked|broken|problem)\b"
+        ),
+        "financial": (
+            r"\b(?:cost|price|budget|money|revenue|payment|expensive|afford)\b"
+        ),
+        "manual_or_time": (
+            r"\b(?:manual|spreadsheet|hours|time[- ]consuming|repetitive|by hand)\b"
+        ),
+        "request_or_search": (
+            r"\b(?:need|looking for|recommend|advice|solution|alternative)\b"
+        ),
     }
     return tuple(name for name, pattern in patterns.items() if re.search(pattern, text))
 
