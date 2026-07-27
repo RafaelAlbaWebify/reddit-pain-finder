@@ -26,7 +26,20 @@ jobs:
           pip install -e ".[dev]"
 
       - name: Lint
-        run: ruff check .
+        id: lint
+        continue-on-error: true
+        run: ruff check . | tee lint-output.txt
+
+      - name: Upload lint diagnostics
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: lint-output
+          path: lint-output.txt
+
+      - name: Enforce lint result
+        if: steps.lint.outcome == 'failure'
+        run: exit 1
 
       - name: Type check
         run: mypy
