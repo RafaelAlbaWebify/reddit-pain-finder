@@ -130,6 +130,9 @@ def analyze_policy_thresholds(
                 if case.expected_pain:
                     false_negative += 1
 
+        ordered_diagnostics = tuple(
+            sorted(diagnostics, key=lambda value: value.source_external_id)
+        )
         rows.append(
             PolicySweepRow(
                 threshold=threshold,
@@ -144,7 +147,7 @@ def analyze_policy_thresholds(
                 accepted_true_positive_ids=tuple(sorted(accepted_true_ids)),
                 accepted_false_positive_ids=tuple(sorted(accepted_false_ids)),
                 review_reason_counts=dict(sorted(review_reason_counts.items())),
-                diagnostics=tuple(sorted(diagnostics, key=lambda value: value.source_external_id)),
+                diagnostics=ordered_diagnostics,
             )
         )
 
@@ -177,14 +180,18 @@ def _markdown(report: PolicySweepReport) -> str:
         f"{row.rejected_count} | {row.precision:.4f} | {row.recall:.4f} |"
         for row in report.rows
     )
-    false_positive_sections = "\n\n".join(
-        f"### Threshold {row.threshold:.2f}\n\n"
-        f"False-positive accept IDs: "
-        f"{', '.join(row.accepted_false_positive_ids) or '<none>'}\n\n"
-        f"Review reasons: "
-        f"{', '.join(f'{key}={value}' for key, value in row.review_reason_counts.items()) or '<none>'}"
-        for row in report.rows
-    )
+    sections: list[str] = []
+    for row in report.rows:
+        false_ids = ", ".join(row.accepted_false_positive_ids) or "<none>"
+        reason_text = ", ".join(
+            f"{key}={value}" for key, value in row.review_reason_counts.items()
+        )
+        sections.append(
+            f"### Threshold {row.threshold:.2f}\n\n"
+            f"False-positive accept IDs: {false_ids}\n\n"
+            f"Review reasons: {reason_text or '<none>'}"
+        )
+    false_positive_sections = "\n\n".join(sections)
     note = (
         "This report is descriptive. It does not change the default policy "
         "or recommend a threshold automatically."
