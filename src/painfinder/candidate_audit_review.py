@@ -5,7 +5,7 @@ from collections import Counter
 from enum import StrEnum
 from pathlib import Path
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel
 
 from painfinder.candidate_audit import CandidateAuditRow
 
@@ -63,10 +63,13 @@ def validate_review_rows(
     expected_ids = [row.source_external_id for row in audit_rows]
     reviewed_ids = [row.audit.source_external_id for row in review_rows]
     if reviewed_ids != expected_ids:
-        raise ValueError("review rows must contain every audit row exactly once and in order")
+        raise ValueError(
+            "review rows must contain every audit row exactly once and in order"
+        )
 
     for row in review_rows:
-        if row.review_decision is not AuditReviewDecision.PENDING and not row.rationale.strip():
+        completed = row.review_decision is not AuditReviewDecision.PENDING
+        if completed and not row.rationale.strip():
             raise ValueError(
                 f"completed review requires rationale: {row.audit.source_external_id}"
             )
