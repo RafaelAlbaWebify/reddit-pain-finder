@@ -254,7 +254,10 @@ def test_semantic_validation_failure_gets_one_grounded_repair(
     assert "Change only fields required" in repair_prompt
     assert "Do not invent facts" in repair_prompt
     assert "Schema-specific rules for PainAssessment" in repair_prompt
-    assert 'If you cannot provide every required grounded field, set verdict="abstain"' in repair_prompt
+    assert (
+        'If you cannot provide every required grounded field, set verdict="abstain"'
+        in repair_prompt
+    )
     assert 'Never keep verdict="pain" while leaving categories' in repair_prompt
     assert "pain verdict requires at least one category" in repair_prompt
 
