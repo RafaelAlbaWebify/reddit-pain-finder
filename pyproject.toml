@@ -27,6 +27,7 @@ dev = [
 [project.scripts]
 painfinder = "painfinder.cli:app"
 painfinder-calibrate = "painfinder.calibration_http_runner:main"
+painfinder-quality-report = "painfinder.candidate_quality_cli:main"
 
 [tool.hatch.build.targets.wheel]
 packages = ["src/painfinder"]
