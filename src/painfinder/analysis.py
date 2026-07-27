@@ -32,7 +32,12 @@ RULES = (
         re.compile(
             r"\b(is there (?:a|any) (?:tool|way)|looking for (?:a|an)|"
             r"wish there was|would pay|multiple customers complain(?:ed)?|"
-            r"doesn['’]?t have dark mode|not having dark mode)\b",
+            r"doesn['’]?t have dark mode|not having dark mode|"
+            r"what is the best way to|i need some guidance|"
+            r"is anyone else (?:reselling|using|selling)|"
+            r"anyone recently (?:cleared|completed|used|tried)|"
+            r"is it a good long-term career|how many are enough|"
+            r"can i change the quote|pourriez-vous me conseiller)\b",
             re.I,
         ),
         "explicit request or willingness-to-pay language",
