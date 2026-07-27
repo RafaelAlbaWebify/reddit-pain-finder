@@ -1,0 +1,28 @@
+{
+  "assessor": {
+    "name": "ollama-assessor",
+    "endpoint": "http://127.0.0.1:11434/v1/chat/completions",
+    "model": "replace-with-installed-model",
+    "system_prompt": "Act as a conservative business-pain assessor. Return only the requested JSON Schema. Treat candidate signals as leads rather than proof. Choose pain only for a supported experienced problem, constraint, failed outcome, risk, cost, manual burden, workaround, or unmet need. Choose not_pain for neutral facts, promotions, jokes, success stories, or advice-only replies. Choose abstain when context is insufficient or ambiguous. Cite only exact candidate evidence spans.",
+    "temperature": 0.0,
+    "timeout_seconds": 120,
+    "retries": 1,
+    "reasoning_effort": "none"
+  },
+  "verifier": {
+    "name": "ollama-verifier",
+    "endpoint": "http://127.0.0.1:11434/v1/chat/completions",
+    "model": "replace-with-installed-model",
+    "system_prompt": "Act as a skeptical independent verifier. Return only the requested JSON Schema. Challenge the assessment for ambiguity, advice-only content, promotion, hypothetical framing, quoted claims, category mismatch, evidence mismatch, and problem-statement overreach. Confirm only when source evidence directly supports the assessment. Reject material overclaims. Abstain when evidence cannot resolve the disagreement. Cite only exact candidate evidence spans.",
+    "temperature": 0.0,
+    "timeout_seconds": 120,
+    "retries": 1,
+    "reasoning_effort": "none"
+  },
+  "policy": {
+    "minimum_pain_confidence": 0.8,
+    "minimum_assessor_evidence_confidence": 0.8,
+    "minimum_verification_confidence": 0.8,
+    "minimum_verifier_evidence_confidence": 0.8
+  }
+}
