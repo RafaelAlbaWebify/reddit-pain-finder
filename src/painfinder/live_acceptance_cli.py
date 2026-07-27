@@ -16,16 +16,26 @@ from painfinder.playwright_collector import PlaywrightRedditCollector
 
 def main() -> int:
     parser = argparse.ArgumentParser(
-        description="Run a bounded live Reddit collection and operational acceptance check."
+        description=(
+            "Run a bounded live Reddit collection and operational acceptance check."
+        ),
     )
     parser.add_argument("--subreddits", required=True)
     parser.add_argument("--sort", choices=("new", "hot", "rising"), default="new")
     parser.add_argument("--max-threads", type=int, default=3)
     parser.add_argument("--max-comments", type=int, default=8)
-    parser.add_argument("--artifacts-dir", type=Path, default=Path("artifacts/live-acceptance"))
+    parser.add_argument(
+        "--artifacts-dir",
+        type=Path,
+        default=Path("artifacts/live-acceptance"),
+    )
     arguments = parser.parse_args()
 
-    seeds = [value.strip() for value in arguments.subreddits.split(",") if value.strip()]
+    seeds = [
+        value.strip()
+        for value in arguments.subreddits.split(",")
+        if value.strip()
+    ]
     if not seeds:
         print("ERROR: at least one subreddit is required")
         return 2
