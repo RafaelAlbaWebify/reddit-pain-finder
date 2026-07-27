@@ -69,6 +69,20 @@ RULES = (
         0.35,
     ),
     Rule(
+        PainCategory.RELIABILITY,
+        re.compile(
+            r"\b(?:i|we|our|my)\b.{0,140}\b(?:"
+            r"spent (?:a |one |two |three |several )?(?:ton|tons|lot|lots|hours?) of time|"
+            r"calls? bouncing|customers? (?:having to )?repeat(?: themselves)?|"
+            r"haven['’]?t closed a deal|below (?:the )?quota|"
+            r"appeals? (?:are |were )?pointless|account (?:is |was )?flagged|"
+            r"capacity (?:seems |is |was )?lower)\b",
+            re.I | re.S,
+        ),
+        "first-person operational failure with concrete impact",
+        0.38,
+    ),
+    Rule(
         PainCategory.COST,
         re.compile(
             r"\b(too expensive|price doubled|cannot justify the cost|overpriced|"
