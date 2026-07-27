@@ -131,6 +131,10 @@ def _markdown(report: PolicySweepReport) -> str:
         f"{row.rejected_count} | {row.precision:.4f} | {row.recall:.4f} |"
         for row in report.rows
     )
+    note = (
+        "This report is descriptive. It does not change the default policy "
+        "or recommend a threshold automatically."
+    )
     return f"""# Policy threshold sweep
 
 Cases: {report.case_count}  
@@ -141,7 +145,7 @@ Skipped records: {report.skipped_count}
 |---:|---:|---:|---:|---:|---:|
 {rows}
 
-This report is descriptive. It does not change the default policy or recommend a threshold automatically.
+{note}
 """
 
 
