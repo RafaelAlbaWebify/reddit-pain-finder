@@ -8,6 +8,7 @@ from pydantic import BaseModel
 from painfinder.benchmark import BenchmarkCase
 from painfinder.calibration_runner import CalibrationRecord
 from painfinder.candidate_detection import generate_candidate_signals
+from painfinder.domain import CandidateSignal
 
 
 class CandidateAuditRow(BaseModel):
@@ -32,7 +33,7 @@ def build_candidate_error_audit(
     records: dict[str, CalibrationRecord],
 ) -> tuple[CandidateAuditRow, ...]:
     signals = generate_candidate_signals([case.item for case in cases])
-    signals_by_id: dict[str, list[object]] = {}
+    signals_by_id: dict[str, list[CandidateSignal]] = {}
     for signal in signals:
         signals_by_id.setdefault(signal.source_external_id, []).append(signal)
 
@@ -62,18 +63,13 @@ def build_candidate_error_audit(
                 body=case.item.body,
                 canonical_url=case.item.canonical_url,
                 detector_ids=tuple(
-                    sorted({str(getattr(signal, "detector_id")) for signal in case_signals})
+                    sorted({signal.detector_id for signal in case_signals})
                 ),
                 signal_types=tuple(
-                    sorted(
-                        {
-                            str(getattr(getattr(signal, "signal_type"), "value"))
-                            for signal in case_signals
-                        }
-                    )
+                    sorted({signal.signal_type.value for signal in case_signals})
                 ),
                 signal_reasons=tuple(
-                    sorted({str(getattr(signal, "reason")) for signal in case_signals})
+                    sorted({signal.reason for signal in case_signals})
                 ),
                 latest_decision=(
                     record.decision.value
@@ -106,7 +102,7 @@ def write_candidate_error_audit(
 
 
 def _markdown(rows: tuple[CandidateAuditRow, ...]) -> str:
-    sections = []
+    sections: list[str] = []
     for row in rows:
         payload = json.dumps(row.model_dump(mode="json"), indent=2, ensure_ascii=False)
         sections.append(
