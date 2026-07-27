@@ -1,5 +1,3 @@
-from pathlib import Path
-
 import pytest
 
 from painfinder.candidate_audit import CandidateAuditRow
