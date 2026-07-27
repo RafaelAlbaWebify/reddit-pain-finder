@@ -33,6 +33,7 @@ painfinder-policy-grid = "painfinder.policy_grid_cli:main"
 painfinder-force-replay = "painfinder.forced_replay_cli:main"
 painfinder-candidate-audit = "painfinder.candidate_audit_cli:main"
 painfinder-audit-review = "painfinder.candidate_audit_review_cli:main"
+painfinder-audit-review-interactive = "painfinder.candidate_audit_interactive_cli:main"
 
 [tool.hatch.build.targets.wheel]
 packages = ["src/painfinder"]
