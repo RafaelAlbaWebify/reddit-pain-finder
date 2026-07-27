@@ -1,11 +1,7 @@
 from __future__ import annotations
 
+from painfinder import pain_assessment
 from painfinder.ai_review_http import ReviewerProfile
-from painfinder.pain_assessment import (
-    PainAssessment,
-    PainAssessmentRequest,
-    assessment_prompt_payload,
-)
 from painfinder.structured_ai_http import complete_structured
 
 
@@ -30,15 +26,18 @@ class HTTPPainAssessor:
     def __init__(self, profile: ReviewerProfile) -> None:
         self.profile = profile
 
-    def assess(self, request: PainAssessmentRequest) -> PainAssessment:
+    def assess(
+        self,
+        request: pain_assessment.PainAssessmentRequest,
+    ) -> pain_assessment.PainAssessment:
         prompt = (
             f"{_ASSESSMENT_OUTPUT_CONTRACT}\n\n"
-            f"{assessment_prompt_payload(request)}"
+            f"{pain_assessment.assessment_prompt_payload(request)}"
         )
         assessment = complete_structured(
             self.profile,
             schema_name="painfinder_pain_assessment",
-            response_model=PainAssessment,
+            response_model=pain_assessment.PainAssessment,
             user_prompt=prompt,
         )
         return assessment.model_copy(
