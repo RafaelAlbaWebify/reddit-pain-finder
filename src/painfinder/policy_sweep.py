@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import json
+from collections import Counter
 from pathlib import Path
 
 from pydantic import BaseModel
@@ -15,6 +16,15 @@ from painfinder.pain_policy import (
 )
 
 
+class PolicyCaseDiagnostic(BaseModel):
+    source_external_id: str
+    expected_pain: bool
+    decision: FinalPolicyDecision
+    reasons: tuple[str, ...]
+    minimum_confidence: float
+    category_agreement: bool
+
+
 class PolicySweepRow(BaseModel):
     threshold: float
     accepted_count: int
@@ -25,6 +35,10 @@ class PolicySweepRow(BaseModel):
     false_negative: int
     precision: float
     recall: float
+    accepted_true_positive_ids: tuple[str, ...]
+    accepted_false_positive_ids: tuple[str, ...]
+    review_reason_counts: dict[str, int]
+    diagnostics: tuple[PolicyCaseDiagnostic, ...]
 
 
 class PolicySweepReport(BaseModel):
@@ -56,6 +70,10 @@ def analyze_policy_thresholds(
         true_positive = 0
         false_positive = 0
         false_negative = 0
+        accepted_true_ids: list[str] = []
+        accepted_false_ids: list[str] = []
+        review_reason_counts: Counter[str] = Counter()
+        diagnostics: list[PolicyCaseDiagnostic] = []
         policy = PainPolicy(
             minimum_pain_confidence=threshold,
             minimum_assessor_evidence_confidence=threshold,
@@ -73,14 +91,38 @@ def analyze_policy_thresholds(
                 ),
                 policy=policy,
             )
+            source_id = case.item.external_id
+            reasons = tuple(reason.value for reason in outcome.reasons)
+            confidences = (
+                record.assessment.pain_confidence,
+                record.assessment.evidence_confidence,
+                record.verification.verification_confidence,
+                record.verification.evidence_confidence,
+            )
+            category_agreement = set(record.assessment.categories) == set(
+                record.verification.confirmed_categories
+            )
+            diagnostics.append(
+                PolicyCaseDiagnostic(
+                    source_external_id=source_id,
+                    expected_pain=case.expected_pain,
+                    decision=outcome.decision,
+                    reasons=reasons,
+                    minimum_confidence=min(confidences),
+                    category_agreement=category_agreement,
+                )
+            )
             if outcome.decision is FinalPolicyDecision.ACCEPT:
                 accepted += 1
                 if case.expected_pain:
                     true_positive += 1
+                    accepted_true_ids.append(source_id)
                 else:
                     false_positive += 1
+                    accepted_false_ids.append(source_id)
             elif outcome.decision is FinalPolicyDecision.REVIEW:
                 review += 1
+                review_reason_counts.update(reasons)
                 if case.expected_pain:
                     false_negative += 1
             else:
@@ -88,6 +130,9 @@ def analyze_policy_thresholds(
                 if case.expected_pain:
                     false_negative += 1
 
+        ordered_diagnostics = tuple(
+            sorted(diagnostics, key=lambda value: value.source_external_id)
+        )
         rows.append(
             PolicySweepRow(
                 threshold=threshold,
@@ -99,6 +144,10 @@ def analyze_policy_thresholds(
                 false_negative=false_negative,
                 precision=_ratio(true_positive, true_positive + false_positive),
                 recall=_ratio(true_positive, true_positive + false_negative),
+                accepted_true_positive_ids=tuple(sorted(accepted_true_ids)),
+                accepted_false_positive_ids=tuple(sorted(accepted_false_ids)),
+                review_reason_counts=dict(sorted(review_reason_counts.items())),
+                diagnostics=ordered_diagnostics,
             )
         )
 
@@ -131,6 +180,18 @@ def _markdown(report: PolicySweepReport) -> str:
         f"{row.rejected_count} | {row.precision:.4f} | {row.recall:.4f} |"
         for row in report.rows
     )
+    sections: list[str] = []
+    for row in report.rows:
+        false_ids = ", ".join(row.accepted_false_positive_ids) or "<none>"
+        reason_text = ", ".join(
+            f"{key}={value}" for key, value in row.review_reason_counts.items()
+        )
+        sections.append(
+            f"### Threshold {row.threshold:.2f}\n\n"
+            f"False-positive accept IDs: {false_ids}\n\n"
+            f"Review reasons: {reason_text or '<none>'}"
+        )
+    false_positive_sections = "\n\n".join(sections)
     note = (
         "This report is descriptive. It does not change the default policy "
         "or recommend a threshold automatically."
@@ -144,6 +205,10 @@ Skipped records: {report.skipped_count}
 | Threshold | Accept | Review | Reject | Accept precision | Accept recall |
 |---:|---:|---:|---:|---:|---:|
 {rows}
+
+## Threshold diagnostics
+
+{false_positive_sections}
 
 {note}
 """
