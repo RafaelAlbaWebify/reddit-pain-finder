@@ -128,14 +128,18 @@ def _repair_prompt(
 def _schema_repair_rules(model_name: str) -> str:
     if model_name == "PainAssessment":
         return (
-            '- For verdict="pain": categories must contain at least one allowed category, '
-            "problem_statement must be a non-empty grounded summary, and cited_evidence "
-            "must contain only exact spans already supported by the source.\n"
-            '- If you cannot provide every required grounded field, set verdict="abstain", '
-            'categories=[], problem_statement="", cited_signal_types=[], and '
-            "cited_evidence=[].\n"
-            '- Never keep verdict="pain" while leaving categories or problem_statement '
-            "empty."
+            '- For verdict="pain": categories must contain at least one allowed category; '
+            "problem_statement must be non-empty; cited_signal_types must contain at "
+            "least one already available signal type; and cited_evidence must contain at "
+            "least one exact source span already present in the preceding JSON or source "
+            "context. Preserve existing cited_signal_types and cited_evidence when they "
+            "are already present.\n"
+            '- If any required pain field cannot be supplied without inventing content, '
+            'set verdict="abstain", categories=[], problem_statement="", '
+            'cited_signal_types=[], and cited_evidence=[].\n'
+            '- Never return verdict="pain" with an empty problem_statement, categories, '
+            "cited_signal_types, or cited_evidence. Do not fix one required field by "
+            "deleting another required field."
         )
     if model_name == "PainVerification":
         return (
